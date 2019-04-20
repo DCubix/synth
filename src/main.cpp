@@ -85,6 +85,8 @@ int main(int argc, char** argv) {
 	spin->suffix(" Vol");
 	events.subscribe(spin);
 
+	SDL_StartTextInput();
+
 	bool running = true;
 	while (running) {
 		running = events.poll();

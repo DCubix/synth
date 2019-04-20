@@ -108,7 +108,7 @@ void Renderer::disableClipping() {
 void Renderer::text(i32 x, i32 y, const std::string& str, u8 r, u8 g, u8 b, u8 a) {
 	i32 tx = x, ty = y;
 	for (u32 i = 0; i < str.size(); i++) {
-		char c = str[i];
+		u8 c = str[i];
 		if (c == '\n') {
 			tx = x;
 			ty += 12;
@@ -152,8 +152,8 @@ void Renderer::patch(i32 x, i32 y, i32 w, i32 h, i32 sx, i32 sy, i32 sw, i32 sh,
 }
 
 void Renderer::putChar(i32 x, i32 y, char c, u8 r, u8 g, u8 b, u8 a) {
-	const u32 sx = u32(c & 0x7F) % 16 * 8;
-	const u32 sy = u32(c & 0x7F) / 16 * 12;
+	const u32 sx = i32(c & 0x7F) % 16 * 8;
+	const u32 sy = i32(c & 0x7F) / 16 * 12;
 	SDL_Rect dstRect = { x, y, 8, 12 };
 	SDL_Rect srcRect = { sx, sy, 8, 12 };
 	

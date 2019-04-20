@@ -7,30 +7,6 @@
 #include "../common.h"
 #include "../sdl2.h"
 
-class IMouseListener {
-public:
-	virtual void onMove(i32 x, i32 y) = 0;
-	virtual void onClick(u8 button, i32 x, i32 y) = 0;
-	virtual void onPress(u8 button, i32 x, i32 y) = 0;
-	virtual void onRelease(u8 button, i32 x, i32 y) = 0;
-	virtual void onScroll(i8 direction) = 0;
-	virtual void onEnter() = 0;
-	virtual void onExit() = 0;
-};
-
-class IKeyListener {
-public:
-	virtual void onType(char chr) = 0;
-	virtual void onPress(u32 key, u32 mod) = 0;
-	virtual void onRelease(u32 key, u32 mod) = 0;
-};
-
-class IElementListener {
-public:
-	virtual void onFocus() = 0;
-	virtual void onBlur() = 0;
-};
-
 #define SY__LAZY_CB(name, sig) void on##name(const std::function<void sig>& cb) { m_on##name = cb; }
 
 class Element {
@@ -42,6 +18,7 @@ public:
 
 	virtual void onMove(i32 x, i32 y) { if (m_onMove) m_onMove(x, y); }
 	virtual void onClick(u8 button, i32 x, i32 y) { if (m_onClick) m_onClick(button, x, y); }
+	virtual void onDoubleClick(u8 button, i32 x, i32 y) { if (m_onDoubleClick) m_onDoubleClick(button, x, y); }
 	virtual void onPress(u8 button, i32 x, i32 y) { if (m_onPress) m_onPress(button, x, y); }
 	virtual void onRelease(u8 button, i32 x, i32 y) { if (m_onRelease) m_onRelease(button, x, y); }
 	virtual void onScroll(i8 direction) { if (m_onScroll) m_onScroll(direction); }
@@ -62,6 +39,7 @@ public:
 
 	SY__LAZY_CB(Move, (i32, i32))
 	SY__LAZY_CB(Click, (u8, i32, i32))
+	SY__LAZY_CB(DoubleClick, (u8, i32, i32))
 	SY__LAZY_CB(Press, (u8, i32, i32))
 	SY__LAZY_CB(Release, (u8, i32, i32))
 	SY__LAZY_CB(Scroll, (i8))
@@ -75,7 +53,7 @@ public:
 
 protected:
 	std::function<void(i32, i32)> m_onMove;
-	std::function<void(u8, i32, i32)> m_onClick, m_onPress, m_onRelease;
+	std::function<void(u8, i32, i32)> m_onClick, m_onDoubleClick, m_onPress, m_onRelease;
 	std::function<void(i8)> m_onScroll;
 	std::function<void()> m_onEnter, m_onExit, m_onFocus, m_onBlur;
 	std::function<void(char)> m_onType;

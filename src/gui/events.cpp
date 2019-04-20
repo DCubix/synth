@@ -2,6 +2,8 @@
 
 #include <algorithm>
 
+#include "../log/log.h"
+
 bool Element::hits(i32 x, i32 y) {
 	return x >= m_bounds.x &&
 		x <= m_bounds.x + m_bounds.width &&
@@ -29,13 +31,19 @@ bool EventHandler::poll() {
 
 					if (el->enabled()) {
 						if (m_focused != nullptr) {
+							m_focused->onBlur();
 							m_focused->m_focused = false;
 						}
 						el->m_focused = true;
+						el->onFocus();
 						m_focused = el;
 
 						el->m_clicked = true;
-						el->onPress(m_event.button.button, x - el->bounds().x, y - el->bounds().y);
+						if (m_event.button.clicks > 1) {
+							el->onDoubleClick(m_event.button.button, x - el->bounds().x, y - el->bounds().y);
+						} else {
+							el->onPress(m_event.button.button, x - el->bounds().x, y - el->bounds().y);
+						}
 					}
 
 					if (cont) break;
@@ -87,6 +95,21 @@ bool EventHandler::poll() {
 			case SDL_MOUSEWHEEL: {
 				if (m_focused != nullptr && m_focused->enabled()) {
 					m_focused->onScroll(m_event.wheel.y);
+				}
+			} break;
+			case SDL_KEYDOWN: {
+				if (m_focused != nullptr) {
+					m_focused->onKeyPress(m_event.key.keysym.sym, m_event.key.keysym.mod);
+				}
+			} break;
+			case SDL_KEYUP: {
+				if (m_focused != nullptr) {
+					m_focused->onKeyRelease(m_event.key.keysym.sym, m_event.key.keysym.mod);
+				}
+			} break;
+			case SDL_TEXTINPUT: {
+				if (m_focused != nullptr) {
+					m_focused->onType(m_event.text.text[0]);
 				}
 			} break;
 		}
