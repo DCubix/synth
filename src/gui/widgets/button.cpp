@@ -29,22 +29,26 @@ void Button::onPress(u8 button, i32 x, i32 y) {
 	Widget::onPress(button, x, y);
 
 	m_state = State::Click;
+	invalidate();
 }
 
 void Button::onRelease(u8 button, i32 x, i32 y) {
 	Widget::onRelease(button, x, y);
 
 	m_state = State::Normal;
+	invalidate();
 }
 
 void Button::onEnter() {
 	Widget::onEnter();
 
 	m_state = State::Hover;
+	invalidate();
 }
 
 void Button::onExit() {
 	Widget::onExit();
 
 	m_state = State::Normal;
+	invalidate();
 }

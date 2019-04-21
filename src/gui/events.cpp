@@ -15,11 +15,18 @@ void EventHandler::subscribe(Element* element) {
 	m_elements.push_back(element);
 }
 
-bool EventHandler::poll() {
-	bool status = true;
+void EventHandler::unsubscribe(Element* element) {
+	auto it = std::find(m_elements.begin(), m_elements.end(), element);
+	if (it != m_elements.end()) {
+		m_elements.erase(it);
+	}
+}
+
+EventHandler::Status EventHandler::poll() {
+	Status status = Running;
 	while (SDL_PollEvent(&m_event)) {
 		switch (m_event.type) {
-			case SDL_QUIT: status = false; break;
+			case SDL_QUIT: status = Quit; break;
 			case SDL_MOUSEBUTTONDOWN: {
 				i32 x = m_event.button.x;
 				i32 y = m_event.button.y;
@@ -34,19 +41,20 @@ bool EventHandler::poll() {
 							m_focused->onBlur();
 							m_focused->m_focused = false;
 						}
-						el->m_focused = true;
-						el->onFocus();
 						m_focused = el;
+
+						m_focused->m_focused = true;
+						m_focused->onFocus();
 
 						el->m_clicked = true;
 						if (m_event.button.clicks > 1) {
 							el->onDoubleClick(m_event.button.button, x - el->bounds().x, y - el->bounds().y);
+							el->onPress(m_event.button.button, x - el->bounds().x, y - el->bounds().y);
 						} else {
 							el->onPress(m_event.button.button, x - el->bounds().x, y - el->bounds().y);
 						}
 					}
-
-					if (cont) break;
+					//if (cont) break;
 				}
 			} break;
 			case SDL_MOUSEBUTTONUP: {
@@ -66,7 +74,7 @@ bool EventHandler::poll() {
 					}
 
 					el->m_clicked = false;
-					if (cont) break;
+					//if (cont) break;
 				}
 			} break;
 			case SDL_MOUSEMOTION: {
@@ -110,6 +118,17 @@ bool EventHandler::poll() {
 			case SDL_TEXTINPUT: {
 				if (m_focused != nullptr) {
 					m_focused->onType(m_event.text.text[0]);
+				}
+			} break;
+			case SDL_WINDOWEVENT: {
+				switch (m_event.window.event) {
+					case SDL_WINDOWEVENT_RESIZED:
+					case SDL_WINDOWEVENT_SIZE_CHANGED:
+					case SDL_WINDOWEVENT_MAXIMIZED:
+					case SDL_WINDOWEVENT_RESTORED:
+					case SDL_WINDOWEVENT_MINIMIZED:
+						status = Resize;
+						break;
 				}
 			} break;
 		}

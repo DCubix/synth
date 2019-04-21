@@ -5,6 +5,7 @@
 #include <cmath>
 #include <sstream>
 #include <string>
+#include <algorithm>
 
 using u8  = uint8_t;
 using u16 = uint16_t;
@@ -32,6 +33,23 @@ namespace util {
 		out.precision(n);
 		out << std::fixed << a_value;
 		return out.str();
+	}
+
+	inline bool hits(i32 x, i32 y, i32 bx, i32 by, i32 bw, i32 bh) {
+		return x >= bx &&
+			x <= bx + bw &&
+			y >= by &&
+			y <= by + bh;
+	}
+	
+	inline bool overlap(i32 a, i32 alen, i32 b, i32 blen) {
+		i32 highestStartPoint = std::max(a, b);
+		i32 lowestEndPoint = std::min(a + alen, b + blen);
+		return highestStartPoint < lowestEndPoint;
+	}
+
+	inline bool hits(i32 x, i32 y, i32 w, i32 h, i32 bx, i32 by, i32 bw, i32 bh) {
+		return overlap(x, w, bx, bw) && overlap(y, h, by, bh);
 	}
 }
 

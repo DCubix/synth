@@ -13,6 +13,10 @@ Node::Param& Node::param(u32 id) {
 	return m_params[id];
 }
 
+std::string Node::paramName(u32 id) {
+	return m_paramNames[id];
+}
+
 NodeSystem::NodeSystem() {
 	m_sampleRate = 44100.0f;
 	m_frequency = 220.0f;
@@ -73,6 +77,16 @@ void NodeSystem::disconnect(u32 connection) {
 	m_lock.unlock();
 }
 
+u32 NodeSystem::getConnection(u32 dest, u32 param) {
+	for (u32 cid : m_usedConnections) {
+		Connection* conn = m_connections[cid].get();
+		if (conn->dest == dest && conn->destParam == param) {
+			return cid;
+		}
+	}
+	return UINT32_MAX;
+}
+
 Sample NodeSystem::sample() {
 	std::vector<u32> broken;
 
@@ -124,8 +138,8 @@ Sample NodeSystem::sample() {
 	auto out = get<Output>(0);
 	if (!out) return { 0.0f, 0.0f };
 	return {
-		m_nodeBuffer[0] * (1.0f - out->pan()),
-		m_nodeBuffer[0] * out->pan()
+		m_nodeBuffer[0] * m_master* (1.0f - out->pan()),
+		m_nodeBuffer[0] * m_master* out->pan()
 	};
 
 }

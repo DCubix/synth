@@ -37,6 +37,8 @@ public:
 	std::string suffix() const { return m_suffix; }
 	void suffix(const std::string& v) { m_suffix = v; }
 
+	void onChange(const std::function<void()>& cb) { m_onChange = cb; }
+
 private:
 	std::function<void()> m_onChange;
 

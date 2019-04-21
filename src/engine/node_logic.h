@@ -18,6 +18,14 @@ constexpr u32 OutputNode = 0;
 
 using Sample = std::pair<f32, f32>;
 
+enum class NodeType {
+	None = 0,
+	Value,
+	Out,
+	SineWave,
+	LFO
+};
+
 class NodeSystem;
 class Node {
 	friend class NodeSystem;
@@ -31,6 +39,7 @@ public:
 	~Node() = default;
 
 	virtual f32 sample(NodeSystem* system) = 0;
+	virtual NodeType type() { return NodeType::None; }
 
 	float level() const { return m_level; }
 	void level(f32 v) { m_level = v; }
@@ -39,6 +48,9 @@ public:
 
 	void addParam(const std::string& name);
 	Param& param(u32 id);
+	std::string paramName(u32 id);
+
+	u32 paramCount() const { return m_params.size(); }
 
 protected:
 	bool solved{ false };
@@ -55,13 +67,27 @@ class Output : public Node {
 public:
 	Output();
 	f32 sample(NodeSystem* system);
+	virtual NodeType type() { return NodeType::Out; }
 
 	float pan() { return param(1).value; }
 	void pan(f32 v) { param(1).value = v; }
 };
 
+class Value : public Node {
+public:
+	inline f32 sample(NodeSystem* system) { return level(); }
+	inline virtual NodeType type() { return NodeType::Value; }
+};
+
 class NodeSystem {
 public:
+	struct Connection {
+		u32 src, dest, destParam;
+
+		Connection() = default;
+		~Connection() = default;
+	};
+
 	NodeSystem();
 	~NodeSystem() = default;
 
@@ -97,6 +123,7 @@ public:
 
 	u32 connect(u32 src, u32 dest, u32 param);
 	void disconnect(u32 connection);
+	u32 getConnection(u32 dest, u32 param);
 
 	Sample sample();
 
@@ -105,14 +132,16 @@ public:
 	f32 frequency() const { return m_frequency; }
 	void frequency(f32 v) { m_frequency = v; }
 
+	std::vector<u32> nodes() { return m_usedNodes; }
+	std::vector<u32> connections() { return m_usedConnections; }
+
+	Connection* getConnection(u32 id) { return m_connections[id].get(); }
+
+	f32 master() const { return m_master; }
+	void master(f32 v) { m_master = v; }
+
 private:
-	struct Connection {
-		u32 src, dest, destParam;
-
-		Connection() = default;
-		~Connection() = default;
-	};
-
+	
 	std::array<std::unique_ptr<Connection>, SynMaxConnections> m_connections;
 	std::vector<u32> m_usedConnections;
 
@@ -122,7 +151,7 @@ private:
 
 	std::mutex m_lock;
 
-	f32 m_sampleRate, m_frequency;
+	f32 m_sampleRate, m_frequency, m_master{ 1.0f };
 };
 
 #endif // SYE_NODE_H

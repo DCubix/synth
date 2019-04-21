@@ -7,8 +7,8 @@
 class SineWave : public Node {
 public:
 	inline SineWave() {
-		addParam("Modulation");
-		addParam("Offset");
+		addParam("Mod.");
+		addParam("Off.");
 	}
 
 	inline f32 sample(NodeSystem* system) {
@@ -17,6 +17,8 @@ public:
 		f32 freqVal = m_phase.advance(system->frequency() + offset, system->sampleRate()) + freqMod;
 		return ::sinf(freqVal);
 	}
+
+	inline NodeType type() { return NodeType::SineWave; }
 
 private:
 	Phase m_phase{ PI * 2.0f };

@@ -2,6 +2,7 @@
 
 #include "skin.h"
 #include "font.h"
+#include "font_small.h"
 #include "stb_image.h"
 
 #define MAX_SHADOW 32.0f
@@ -26,6 +27,8 @@ Renderer::Renderer(SDL_Renderer* ren)
 
 	pixels = stbi_load_from_memory(font_data, font_size, &w, &h, &comp, 4);
 	if (pixels) {
+		m_fontWidth = w;
+		m_fontHeight = h;
 		m_font = SDL_CreateTexture(
 			m_ren,
 			SDL_PIXELFORMAT_RGBA32,
@@ -37,6 +40,23 @@ Renderer::Renderer(SDL_Renderer* ren)
 
 		SDL_SetTextureBlendMode(m_font, SDL_BLENDMODE_BLEND);
 	}
+
+	pixels = stbi_load_from_memory(font_small_data, font_small_size, &w, &h, &comp, 4);
+	if (pixels) {
+		m_fontSmallWidth = w;
+		m_fontSmallHeight = h;
+		m_fontSmall = SDL_CreateTexture(
+			m_ren,
+			SDL_PIXELFORMAT_RGBA32,
+			SDL_TEXTUREACCESS_STATIC,
+			w, h
+		);
+		SDL_UpdateTexture(m_fontSmall, nullptr, (void*)pixels, w * 4);
+		stbi_image_free(pixels);
+
+		SDL_SetTextureBlendMode(m_fontSmall, SDL_BLENDMODE_BLEND);
+	}
+
 	SDL_SetRenderDrawBlendMode(m_ren, SDL_BLENDMODE_BLEND);
 }
 
@@ -50,6 +70,31 @@ Renderer::~Renderer() {
 void Renderer::line(i32 x1, i32 y1, i32 x2, i32 y2, u8 r, u8 g, u8 b, u8 a) {
 	SDL_SetRenderDrawColor(m_ren, r, g, b, a);
 	SDL_RenderDrawLine(m_ren, x1, y1, x2, y2);
+}
+
+static f32 deCasteljau(f32 a, f32 b, f32 c, f32 d, f32 t) {
+	return std::powf(1.0f - t, 3)* a +
+		3.0f * std::powf(1.0f - t, 2) * t * b +
+		3.0f * (1.0f - t) * std::powf(t, 2) * c +
+		std::powf(t, 3) * d;
+}
+
+void Renderer::curve(
+	i32 x1, i32 y1, i32 x2, i32 y2, i32 x3, i32 y3, i32 x4, i32 y4,
+	u8 r, u8 g, u8 b, u8 a
+) {
+	const u32 steps = 32;
+
+	i32 px = i32(deCasteljau(x1, x2, x3, x4, 0));
+	i32 py = i32(deCasteljau(y1, y2, y3, y4, 0));
+	for (u32 i = 1; i <= steps; i++) {
+		f32 t = f32(i) / f32(steps);
+		i32 x = i32(deCasteljau(x1, x2, x3, x4, t));
+		i32 y = i32(deCasteljau(y1, y2, y3, y4, t));
+		line(px, py, x, y, r, g, b, a);
+		px = x;
+		py = y;
+	}
 }
 
 void Renderer::rect(i32 x, i32 y, i32 w, i32 h, u8 r, u8 g, u8 b, u8 a, bool fill) {
@@ -106,17 +151,11 @@ void Renderer::disableClipping() {
 }
 
 void Renderer::text(i32 x, i32 y, const std::string& str, u8 r, u8 g, u8 b, u8 a) {
-	i32 tx = x, ty = y;
-	for (u32 i = 0; i < str.size(); i++) {
-		u8 c = str[i];
-		if (c == '\n') {
-			tx = x;
-			ty += 12;
-		} else {
-			if (!::isspace(c)) putChar(tx, ty, c, r, g, b, a);
-		}
-		tx += 8;
-	}
+	textGen(m_font, m_fontWidth, m_fontHeight, x, y, str, r, g, b, a);
+}
+
+void Renderer::textSmall(i32 x, i32 y, const std::string& str, u8 r, u8 g, u8 b, u8 a) {
+	textGen(m_fontSmall, m_fontSmallWidth, m_fontSmallHeight, x, y, str, r, g, b, a);
 }
 
 void Renderer::skin(i32 x, i32 y, i32 w, i32 h, i32 sx, i32 sy, i32 sw, i32 sh) {
@@ -151,13 +190,30 @@ void Renderer::patch(i32 x, i32 y, i32 w, i32 h, i32 sx, i32 sy, i32 sw, i32 sh,
 	skin(x + (w - pad), y + (h - pad), pad, pad, sx + (sw - tpad), sy + (sh - tpad), tpad, tpad); // B
 }
 
-void Renderer::putChar(i32 x, i32 y, char c, u8 r, u8 g, u8 b, u8 a) {
-	const u32 sx = i32(c & 0x7F) % 16 * 8;
-	const u32 sy = i32(c & 0x7F) / 16 * 12;
-	SDL_Rect dstRect = { x, y, 8, 12 };
-	SDL_Rect srcRect = { sx, sy, 8, 12 };
+void Renderer::textGen(SDL_Texture* font, i32 fw, i32 fh, i32 x, i32 y, const std::string& str, u8 r, u8 g, u8 b, u8 a) {
+	i32 tx = x, ty = y;
+	for (u32 i = 0; i < str.size(); i++) {
+		u8 c = str[i];
+		if (c == '\n') {
+			tx = x;
+			ty += 12;
+		} else {
+			if (!::isspace(c)) putChar(font, fw, fh, tx, ty, c, r, g, b, a);
+		}
+		tx += 8;
+	}
+}
+
+void Renderer::putChar(SDL_Texture* font, i32 fw, i32 fh, i32 x, i32 y, char c, u8 r, u8 g, u8 b, u8 a) {
+	const u32 cw = fw / 16;
+	const u32 ch = fh / 16;
+
+	const u32 sx = i32(c & 0x7F) % 16 * cw;
+	const u32 sy = i32(c & 0x7F) / 16 * ch;
+	SDL_Rect dstRect = { x, y, cw, ch };
+	SDL_Rect srcRect = { sx, sy, cw, ch };
 	
-	SDL_SetTextureColorMod(m_font, r, g, b);
-	SDL_SetTextureAlphaMod(m_font, a);
-	SDL_RenderCopy(m_ren, m_font, &srcRect, &dstRect);
+	SDL_SetTextureColorMod(font, r, g, b);
+	SDL_SetTextureAlphaMod(font, a);
+	SDL_RenderCopy(m_ren, font, &srcRect, &dstRect);
 }

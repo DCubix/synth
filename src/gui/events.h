@@ -9,6 +9,7 @@
 
 #define SY__LAZY_CB(name, sig) void on##name(const std::function<void sig>& cb) { m_on##name = cb; }
 
+class EventHandler;
 class Element {
 	friend class EventHandler;
 public:
@@ -67,8 +68,15 @@ protected:
 
 class EventHandler {
 public:
+	enum Status {
+		Running = 0,
+		Quit,
+		Resize
+	};
+
 	void subscribe(Element* element);
-	bool poll();
+	void unsubscribe(Element* element);
+	Status poll();
 
 private:
 	SDL_Event m_event;

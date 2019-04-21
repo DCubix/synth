@@ -2,17 +2,19 @@
 
 #include "common.h"
 #include "sdl2.h"
-
 #include "log/log.h"
 
 #include "engine/node_logic.h"
 #include "engine/sine_wave.hpp"
 #include "engine/lfo.hpp"
 
-#include "gui/renderer.h"
-#include "gui/events.h"
+#include "gui/gui.h"
 #include "gui/widgets/button.h"
 #include "gui/widgets/spinner.h"
+#include "gui/widgets/check.h"
+#include "gui/widgets/label.h"
+#include "gui/widgets/panel.h"
+#include "gui/widgets/node_canvas.h"
 
 void callback(void* userdata, Uint8* stream, int len) {
 	NodeSystem* sys = static_cast<NodeSystem*>(userdata);
@@ -28,27 +30,7 @@ void callback(void* userdata, Uint8* stream, int len) {
 }
 
 int main(int argc, char** argv) {
-	//SDL_Init(SDL_INIT_EVERYTHING);
-
-	/*std::unique_ptr<NodeSystem> nsys = std::make_unique<NodeSystem>();
-	
-	SDL_AudioDeviceID device;
-	SDL_AudioSpec spec;
-	spec.freq = 44100;
-	spec.samples = 1024;
-	spec.channels = 2;
-	spec.callback = callback;
-	spec.userdata = nsys.get();
-	spec.format = AUDIO_F32;
-
-	SDL_AudioSpec obspec;
-	if ((device = SDL_OpenAudioDevice(nullptr, 0, &spec, &obspec, 0)) < 0) {
-		LogE(SDL_GetError());
-		return 1;
-	}
-
-	SDL_PauseAudioDevice(device, 0);
-	SDL_Delay(2000);*/
+	SDL_Init(SDL_INIT_EVERYTHING);
 
 	SDL_Window* win;
 	SDL_Renderer* ren;
@@ -58,45 +40,80 @@ int main(int argc, char** argv) {
 		SDL_WINDOWPOS_CENTERED,
 		SDL_WINDOWPOS_CENTERED,
 		640, 480,
-		SDL_WINDOW_SHOWN
+		SDL_WINDOW_SHOWN | SDL_WINDOW_RESIZABLE
 	);
 
 	ren = SDL_CreateRenderer(win, -1, SDL_RENDERER_ACCELERATED);
 
-	Renderer gren(ren);
-	EventHandler events{};
+	GUI* gui = new GUI(ren);
+	Panel* root = gui->root();
+	
+	NodeCanvas* cnv = gui->create<NodeCanvas>();
+	cnv->configure(0, 0, 12, 16);
+	root->add(cnv);
 
-	Button* elem = new Button();
-	elem->bounds().x = 34;
-	elem->bounds().y = 45;
-
-	elem->onClick([elem](u8 btn, i32 x, i32 y) {
-		elem->text("Clicked \x02");
+	Spinner* valueNode = gui->create<Spinner>();
+	valueNode->onChange([&]() {
+		for (u32 nid : cnv->selected()) {
+			Node* node = cnv->system()->get<Node>(nid);
+			node->level(valueNode->value());
+		}
 	});
+	valueNode->configure(2, 12, 4);
+	valueNode->minimum(-9999.0f);
+	valueNode->maximum(9999.0f);
+	valueNode->value(0.0f);
+	valueNode->suffix(" Lvl.");
+	root->add(valueNode);
 
-	events.subscribe(elem);
+	Spinner* spnMaster = gui->create<Spinner>();
+	spnMaster->onChange([&]() {
+		cnv->system()->master(spnMaster->value());
+	});
+	spnMaster->configure(0, 12, 4);
+	spnMaster->value(0.5f);
+	spnMaster->suffix(" Vol.");
+	root->add(spnMaster);
 
-	Spinner* spin = new Spinner();
-	spin->bounds().x = 34;
-	spin->bounds().y = 80;
-	spin->minimum(0.0f);
-	spin->maximum(1.0f);
-	spin->step(0.1f);
-	spin->suffix(" Vol");
-	events.subscribe(spin);
+	Spinner* spnFreq = gui->create<Spinner>();
+	spnFreq->onChange([&]() {
+		cnv->system()->frequency(spnFreq->value());
+	});
+	spnFreq->configure(1, 12, 4);
+	spnFreq->minimum(20.0f);
+	spnFreq->maximum(2000.0f);
+	spnFreq->value(220.0f);
+	spnFreq->suffix(" Hz");
+	root->add(spnFreq);
+
+	SDL_AudioDeviceID device;
+	SDL_AudioSpec spec;
+	spec.freq = 44100;
+	spec.samples = 1024;
+	spec.channels = 2;
+	spec.callback = callback;
+	spec.userdata = cnv->system();
+	spec.format = AUDIO_F32;
+
+	SDL_AudioSpec obspec;
+	if ((device = SDL_OpenAudioDevice(nullptr, 0, &spec, &obspec, 0)) < 0) {
+		LogE(SDL_GetError());
+		return 1;
+	}
+
+	SDL_PauseAudioDevice(device, 0);
 
 	SDL_StartTextInput();
-
 	bool running = true;
 	while (running) {
-		running = events.poll();
-
-		SDL_SetRenderDrawColor(ren, 50, 50, 50, 255);
-		SDL_RenderClear(ren);
-
-		elem->onDraw(gren);
-		spin->onDraw(gren);
-
+		switch (gui->events()->poll()) {
+			case EventHandler::Status::Quit: running = false; break;
+			case EventHandler::Status::Resize: gui->clear(); break;
+			default: break;
+		}
+		int w, h;
+		SDL_GetWindowSize(win, &w, &h);
+		gui->render(w, h);
 		SDL_RenderPresent(ren);
 	}
 
@@ -105,8 +122,7 @@ int main(int argc, char** argv) {
 
 	SDL_Quit();
 
-	delete elem;
-	delete spin;
+	delete gui;
 
 	return 0;
 }

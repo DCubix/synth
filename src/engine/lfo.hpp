@@ -9,9 +9,9 @@
 class LFO : public Node {
 public:
 	inline LFO() {
-		addParam("Frequency");
-		addParam("Min");
-		addParam("Max");
+		addParam("Freq.");
+		addParam("Min.");
+		addParam("Max.");
 		param(0).value = 2.0f;
 		param(1).value = 0.0f;
 		param(2).value = 1.0f;
@@ -26,6 +26,8 @@ public:
 		//LogI(val);
 		return val;
 	}
+
+	inline NodeType type() { return NodeType::LFO; }
 
 private:
 	Phase m_phase{ PI * 2.0f };

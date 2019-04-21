@@ -1,4 +1,4 @@
-#define SYG_LABEL_H
+#ifndef SYG_LABEL_H
 #define SYG_LABEL_H
 
 #include "widget.h"
@@ -18,7 +18,7 @@ public:
 	void textAlign(Alignment v) { m_textAlign = v; }
 
 private:
-	std::string m_text{ "Button" };
+	std::string m_text{ "Label" };
 	Alignment m_textAlign{ Left };
 };
 
