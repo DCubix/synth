@@ -1,6 +1,7 @@
 #include "spinner.h"
 
 #include <algorithm>
+#include "../../log/log.h"
 
 constexpr i32 buttonW = 16;
 
@@ -22,7 +23,7 @@ void Spinner::onDraw(Renderer& renderer) {
 	i32 barW = i32((mainW - 4) * vnorm);
 
 	renderer.panel(b.x, b.y, mainW, b.height);
-	renderer.rect(b.x + 2, b.y + 2, barW, b.height - 4, 0, 0, 0, 80, true);
+	if (m_draggable) renderer.rect(b.x + 2, b.y + 2, barW, b.height - 4, 0, 0, 0, 80, true);
 
 	i32 halfH = b.height / 2;
 	renderer.button(b.x + mainW, b.y, buttonW, halfH, m_incState);
@@ -30,7 +31,7 @@ void Spinner::onDraw(Renderer& renderer) {
 	renderer.text(b.x + mainW + 4, b.y + (halfH / 2 - 6), "\x1E", 0, 0, 0, 180);
 	renderer.text(b.x + mainW + 4, b.y + halfH + (halfH / 2 - 6), "\x1F", 0, 0, 0, 180);
 
-	renderer.enableClipping(b.x, b.y, mainW, b.height);
+	renderer.pushClipping(b.x, b.y, mainW, b.height);
 	if (!m_editing) {
 		auto txt = util::to_string_prec(m_value, 3) + m_suffix;
 		i32 tw = renderer.textWidth(txt);
@@ -44,7 +45,7 @@ void Spinner::onDraw(Renderer& renderer) {
 		renderer.text(b.x + cx + 3, b.y + (b.height / 2 - 6) + 1, "|", 0, 0, 0, 128);
 		renderer.text(b.x + cx + 2, b.y + (b.height / 2 - 6), "|", 255, 255, 255, 128);
 	}
-	renderer.disableClipping();
+	renderer.popClipping();
 }
 
 void Spinner::onMove(i32 x, i32 y) {
@@ -67,14 +68,13 @@ void Spinner::onMove(i32 x, i32 y) {
 		invalidate();
 	}
 
-	if (m_decState == 0 && m_incState == 0 && m_clicked) {
+	if (m_decState == 0 && m_incState == 0 && m_clicked && m_draggable) {
 		f32 xnorm = f32(x) / (mainW - 2);
+		xnorm = std::clamp(xnorm, 0.0f, 1.0f);
 
 		f32 val = m_min + xnorm * (m_max - m_min);
-		val = std::clamp(val, m_min, m_max);
-		val = std::floor(val / m_step) * m_step;
+			val = std::floor(val / m_step) * m_step;
 		value(val);
-		invalidate();
 	}
 
 	Widget::onMove(x, y);
@@ -85,14 +85,13 @@ void Spinner::onClick(u8 button, i32 x, i32 y) {
 
 	auto b = bounds();
 	i32 mainW = b.width - buttonW;
-	if (hitsR(x, y, 0, 0, mainW, b.height)) {
+	if (hitsR(x, y, 0, 0, mainW, b.height) && m_draggable) {
 		f32 xnorm = f32(x) / (mainW - 2);
+		xnorm = std::clamp(xnorm, 0.0f, 1.0f);
 
 		f32 val = m_min + xnorm * (m_max - m_min);
-		val = std::clamp(val, m_min, m_max);
 		val = std::floor(val / m_step) * m_step;
 		value(val);
-		invalidate();
 	}
 }
 
@@ -115,7 +114,7 @@ void Spinner::onPress(u8 button, i32 x, i32 y) {
 		i32 halfH = b.height / 2;
 		i32 mainW = b.width - buttonW;
 		if (hitsR(x, y, mainW, 0, buttonW, halfH)) { // INC
-			value(value() + step());
+			value(std::clamp(value() + step(), m_min, m_max));
 			m_incState = 2;
 			invalidate();
 		} else {
@@ -124,14 +123,13 @@ void Spinner::onPress(u8 button, i32 x, i32 y) {
 		}
 
 		if (hitsR(x, y, mainW, halfH, buttonW, halfH)) { // DEC
-			value(value() - step());
+			value(std::clamp(value() - step(), m_min, m_max));
 			m_decState = 2;
 			invalidate();
 		} else {
 			m_decState = 1;
 			invalidate();
 		}
-		m_value = std::clamp(m_value, m_min, m_max);
 	}
 }
 
@@ -178,7 +176,6 @@ void Spinner::onBlur() {
 			) == m_valText.end()
 			) {
 			value(std::clamp(std::stof(m_valText), m_min, m_max));
-			invalidate();
 		}
 	}
 }
@@ -194,6 +191,7 @@ void Spinner::onKeyPress(u32 key, u32 mod) {
 }
 
 void Spinner::value(f32 v) {
+	if (m_onChange) m_onChange(v);
 	m_value = v;
-	if (m_onChange) m_onChange();
+	invalidate();
 }

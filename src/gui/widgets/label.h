@@ -12,10 +12,10 @@ public:
 	virtual void onDraw(Renderer& renderer) override;
 
 	std::string text() const { return m_text; }
-	void text(const std::string& v) { m_text = v; }
+	void text(const std::string& v) { m_text = v; invalidate(); }
 
 	Alignment textAlign() const { return m_textAlign; }
-	void textAlign(Alignment v) { m_textAlign = v; }
+	void textAlign(Alignment v) { m_textAlign = v; invalidate(); }
 
 private:
 	std::string m_text{ "Label" };

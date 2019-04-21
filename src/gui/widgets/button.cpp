@@ -11,7 +11,7 @@ void Button::onDraw(Renderer& renderer) {
 	auto b = bounds();
 	renderer.button(b.x, b.y, b.width, b.height, u32(m_state));
 
-	renderer.enableClipping(b.x, b.y, b.width, b.height);
+	renderer.pushClipping(b.x, b.y, b.width, b.height);
 	renderer.text(
 		b.x + (b.width / 2 - renderer.textWidth(m_text) / 2) + 1, b.y + (b.height / 2 - 6) + 1,
 		m_text,
@@ -22,7 +22,7 @@ void Button::onDraw(Renderer& renderer) {
 		m_text,
 		255, 255, 255, 180
 	);
-	renderer.disableClipping();
+	renderer.popClipping();
 }
 
 void Button::onPress(u8 button, i32 x, i32 y) {

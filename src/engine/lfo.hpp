@@ -23,8 +23,17 @@ public:
 		f32 max  = param(2).value;
 		f32 freqVal = m_phase.advance(freq, system->sampleRate());
 		f32 val = min + (::sinf(freqVal) * 0.5f + 0.5f) * (max - min);
-		//LogI(val);
 		return val;
+	}
+
+	inline virtual Program build() override {
+		return ProgramBuilder()
+			.pushp(&param(0).value)
+			.pushp(&param(1).value)
+			.pushp(&param(2).value)
+			.pushp(&m_level)
+			.lfo()
+			.build();
 	}
 
 	inline NodeType type() { return NodeType::LFO; }

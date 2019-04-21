@@ -18,6 +18,15 @@ public:
 		return ::sinf(freqVal);
 	}
 
+	inline virtual Program build() override {
+		return ProgramBuilder()
+			.pushp(&param(0).value)
+			.pushp(&param(1).value)
+			.pushp(&m_level)
+			.sine()
+			.build();
+	}
+
 	inline NodeType type() { return NodeType::SineWave; }
 
 private:

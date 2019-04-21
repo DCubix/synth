@@ -10,8 +10,12 @@ public:
 	f32 advance(f32 freq, f32 sampleRate);
 	void reset();
 
+	bool active() const { return m_active; }
+	void active(bool v) { m_active = v; }
+
 private:
 	f32 m_phase, m_period;
+	bool m_active{ true };
 };
 
 #endif // SY_PHASE_H

@@ -37,10 +37,13 @@ public:
 	std::string suffix() const { return m_suffix; }
 	void suffix(const std::string& v) { m_suffix = v; }
 
-	void onChange(const std::function<void()>& cb) { m_onChange = cb; }
+	bool draggable() const { return m_draggable; }
+	void draggable(bool v) { m_draggable = v; }
+
+	void onChange(const std::function<void(f32)>& cb) { m_onChange = cb; }
 
 private:
-	std::function<void()> m_onChange;
+	std::function<void(f32)> m_onChange;
 
 	f32 m_value{ 0.0f }, m_min{ 0.0f }, m_max{ 1.0f }, m_step{ 0.1f };
 	u8 m_decState{ 0 }, m_incState{ 0 };
@@ -48,7 +51,7 @@ private:
 	std::string m_suffix{ };
 	i32 m_mx{ 0 };
 
-	bool m_editing{ false };
+	bool m_editing{ false }, m_draggable{ true };
 	std::string m_valText{};
 };
 

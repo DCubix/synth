@@ -24,6 +24,9 @@ public:
 	u32 spacing() const { return m_spacing; }
 	void spacing(u32 v) { m_spacing = v; }
 
+	void removeAll();
+	virtual void invalidate() override;
+
 private:
 	std::vector<Widget*> m_children;
 	u32 m_gridWidth{ 2 }, // # of columns

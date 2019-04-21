@@ -1,6 +1,5 @@
 #include "node_canvas.h"
 
-#include "../../engine/sine_wave.hpp"
 #include "../../log/log.h"
 
 constexpr u32 NodeWidth = 68;
@@ -8,21 +7,9 @@ constexpr u32 NodeHeight = 54;
 
 NodeCanvas::NodeCanvas() {
 	m_system = std::make_unique<NodeSystem>();
-
 	m_gnodes[0].x = 0;
 	m_gnodes[0].y = 0;
 	m_gnodes[0].node = 0;
-
-	// Test
-	u32 id = m_system->create<SineWave>();
-	m_gnodes[id].x = 20;
-	m_gnodes[id].y = 20;
-	m_gnodes[id].node = id;
-
-	id = m_system->create<Value>();
-	m_gnodes[id].x = 20;
-	m_gnodes[id].y = 80;
-	m_gnodes[id].node = id;
 }
 
 static u32 inY(u32 index) {
@@ -34,7 +21,7 @@ void NodeCanvas::onDraw(Renderer& renderer) {
 	renderer.panel(b.x, b.y, b.width, b.height);
 	renderer.rect(b.x, b.y, b.width, b.height, 0, 0, 0, 70, true);
 
-	renderer.enableClipping(b.x + 1, b.y + 1, b.width - 2, b.height - 2);
+	renderer.pushClipping(b.x + 1, b.y + 1, b.width - 2, b.height - 2);
 
 	auto nodes = m_system->nodes();
 	std::sort(nodes.begin(), nodes.end(), [&](u32 a, u32 b) {
@@ -52,6 +39,7 @@ void NodeCanvas::onDraw(Renderer& renderer) {
 
 		if (node->type() != NodeType::Out) {
 			renderer.flatPanel(nx, ny, NodeWidth, NodeHeight, 0, 3, 0.8f);
+			renderer.pushClipping(nx + 1, ny + 1, NodeWidth - 2, NodeHeight - 2);
 			renderer.rect(nx + 1, ny + 1, NodeWidth - 2, 16, 0, 0, 0, 80, true);
 
 			std::string txt = "";
@@ -68,6 +56,7 @@ void NodeCanvas::onDraw(Renderer& renderer) {
 				i32 py = inY(i) + ny;
 				renderer.textSmall(nx + 4, py + 4, node->paramName(i), 0, 0, 0, 200);
 			}
+			renderer.popClipping();
 
 			for (u32 i = 0; i < node->paramCount(); i++) {
 				i32 py = inY(i) + ny;
@@ -82,6 +71,8 @@ void NodeCanvas::onDraw(Renderer& renderer) {
 			if (gnode.selected) {
 				renderer.rect(nx + 2, ny + 2, NodeWidth - 4, NodeHeight - 4, 255, 255, 255, 50, true);
 			}
+
+			//renderer.textSmall(nx + 4, py + 4, std::to_string(node->level()), 255, 0, 0, 255);
 		} else {
 			renderer.flatPanel(nx, ny, NodeWidth, NodeHeight, 0, 3, 0.8f);
 			i32 py = inY(0) + ny;
@@ -103,14 +94,26 @@ void NodeCanvas::onDraw(Renderer& renderer) {
 
 		i32 srcX = src.x + NodeWidth + 11;
 		i32 destX = dest.x - 6;
-
-		renderer.curve(
-			srcX, lsy,
-			srcX + 50, lsy,
-			srcX + 50, ldy,
-			destX, ldy,
-			255, 255, 255, 180
-		);
+		
+		if (srcX > destX) {
+			i32 mid = (ldy - lsy) / 2;
+			renderer.curve(
+				srcX, lsy,
+				srcX + 50, lsy + mid,
+				destX - 50, ldy - mid,
+				destX, ldy,
+				255, 255, 255, 180
+			);
+		} else {
+			i32 mid = (destX - srcX) / 2;
+			renderer.curve(
+				srcX, lsy,
+				srcX + mid, lsy,
+				srcX + mid, ldy,
+				destX, ldy,
+				255, 255, 255, 180
+			);
+		}
 	}
 	
 	if (m_state == Linking) {
@@ -128,7 +131,7 @@ void NodeCanvas::onDraw(Renderer& renderer) {
 		);
 	}
 
-	renderer.disableClipping();
+	renderer.popClipping();
 }
 
 void NodeCanvas::onClick(u8 button, i32 x, i32 y) {
@@ -214,12 +217,7 @@ void NodeCanvas::onPress(u8 button, i32 x, i32 y) {
 		}
 
 		if (!hitSomething) {
-			for (auto&& nid : m_selected) {
-				m_gnodes[nid].selected = false;
-			}
-			m_selected.clear();
-			invalidate();
-			if (m_onSelect) m_onSelect(nullptr);
+			deselect();
 			m_state = m_link.active ? Linking : Selecting;
 		} else {
 			m_state = Moving;
@@ -227,6 +225,8 @@ void NodeCanvas::onPress(u8 button, i32 x, i32 y) {
 		m_px = x;
 		m_py = y;
 	}
+
+	Widget::onPress(button, x, y);
 }
 
 void NodeCanvas::onRelease(u8 button, i32 x, i32 y) {
@@ -243,6 +243,7 @@ void NodeCanvas::onRelease(u8 button, i32 x, i32 y) {
 				m_system->connect(m_link.src, nid, i);
 				m_link.src = 0;
 				m_link.active = false;
+				if (m_onConnect) m_onConnect();
 				break;
 			}
 		}
@@ -260,4 +261,13 @@ void NodeCanvas::onKeyPress(u32 key, u32 mod) {
 
 void NodeCanvas::onKeyRelease(u32 key, u32 mod) {
 	if (key == SDLK_LCTRL || key == SDLK_RCTRL) m_multiSelect = false;
+}
+
+void NodeCanvas::deselect() {
+	for (auto&& nid : m_selected) {
+		m_gnodes[nid].selected = false;
+	}
+	m_selected.clear();
+	if (m_onSelect) m_onSelect(nullptr);
+	invalidate();
 }

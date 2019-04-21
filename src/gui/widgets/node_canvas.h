@@ -4,12 +4,6 @@
 #include "widget.h"
 #include "../../engine/node_logic.h"
 
-class GNodeGUI {
-public:
-	virtual void build(GUI* gui) = 0;
-	virtual void destroy(GUI* gui) = 0;
-};
-
 struct GNode {
 	i32 x{ 0 }, y{ 0 };
 	u32 node{ 0 };
@@ -25,6 +19,16 @@ class NodeCanvas : public Widget {
 public:
 	NodeCanvas();
 
+	template <typename T>
+	u32 create() {
+		u32 id = m_system->create<T>();
+		m_gnodes[id].x = 20;
+		m_gnodes[id].y = 20;
+		m_gnodes[id].node = id;
+		invalidate();
+		return id;
+	}
+
 	virtual void onDraw(Renderer& renderer) override;
 
 	virtual void onClick(u8 button, i32 x, i32 y) override;
@@ -38,6 +42,10 @@ public:
 	std::vector<u32> selected() { return m_selected; }
 
 	void onSelect(const std::function<void(Node*)>& cb) { m_onSelect = cb; }
+	void onConnect(const std::function<void()>& cb) { m_onConnect = cb; }
+	void deselect();
+
+	Node* current() { return m_selected.empty() ? nullptr : m_system->get<Node>(m_selected[0]); }
 
 private:
 	enum State {
@@ -48,6 +56,7 @@ private:
 	};
 
 	std::function<void(Node*)> m_onSelect;
+	std::function<void()> m_onConnect;
 
 	std::array<GNode, SynMaxNodes> m_gnodes;
 	std::unique_ptr<NodeSystem> m_system;

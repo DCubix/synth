@@ -16,8 +16,52 @@
 #include "gui/widgets/panel.h"
 #include "gui/widgets/node_canvas.h"
 
+#include "../rtmidi/RtMidi.h"
+
+enum MidiCommand {
+	NoteOff = 0x8,
+	NoteOn = 0x9,
+	Aftertouch = 0xA,
+	ContinuousController = 0xB,
+	PatchChange = 0xC,
+	ChannelPressure = 0xD,
+	PitchBend = 0xE,
+	System = 0xF
+};
+
+void midiCallback(double dt, std::vector<u8>* message, void* userdata) {
+	Synth* sys = static_cast<Synth*>(userdata);
+
+	u32 nBytes = message->size();
+	if (nBytes > 3) return;
+
+	std::array<u8, 3> data;
+	for (int i = 0; i < nBytes; i++)
+		data[i] = (*message)[i];
+
+	MidiCommand command = (MidiCommand)((data[0] & 0xF0) >> 4);
+	u8 channel = data[0] & 0xF;
+	u8 param0 = data[1] & 0x7F;
+	u8 param1 = data[2] & 0x7F;
+	u32 param = (param0 & 0x7F) | (param1 & 0x7F) << 7;
+
+	LogI("MIDI: CMD = ", (command), ", P0 = ", int(param0), ", P1 = ", int(param1), " (", param, ")");
+
+	switch (command) {
+		case MidiCommand::NoteOn: {
+			if (param1 > 0) {
+				sys->noteOn(param0, f32(param1) / 128.0f);
+			} else {
+				sys->noteOff(param0, 0.0f);
+			}
+		} break;
+		case MidiCommand::NoteOff: sys->noteOff(param0, 0.0f); break;
+		default: break;
+	}
+}
+
 void callback(void* userdata, Uint8* stream, int len) {
-	NodeSystem* sys = static_cast<NodeSystem*>(userdata);
+	Synth* sys = static_cast<Synth*>(userdata);
 
 	const int flen = len / sizeof(f32);
 	f32* fstream = reinterpret_cast<f32*>(stream);
@@ -45,46 +89,134 @@ int main(int argc, char** argv) {
 
 	ren = SDL_CreateRenderer(win, -1, SDL_RENDERER_ACCELERATED);
 
+	std::unique_ptr<Synth> vm = std::unique_ptr<Synth>(new Synth());
+	std::unique_ptr<RtMidiIn> midin = std::unique_ptr<RtMidiIn>(new RtMidiIn(
+		RtMidi::UNSPECIFIED, "Synth MIDI In"
+	));
+	midin->openPort(0, "SYMain In");
+	midin->setCallback(&midiCallback, vm.get());
+	midin->ignoreTypes();
+
 	GUI* gui = new GUI(ren);
 	Panel* root = gui->root();
+	root->gridHeight(20);
 	
 	NodeCanvas* cnv = gui->create<NodeCanvas>();
-	cnv->configure(0, 0, 12, 16);
+	cnv->configure(0, 0, 11, 20);
 	root->add(cnv);
 
-	Spinner* valueNode = gui->create<Spinner>();
-	valueNode->onChange([&]() {
-		for (u32 nid : cnv->selected()) {
-			Node* node = cnv->system()->get<Node>(nid);
-			node->level(valueNode->value());
+	Label* optTitle = gui->create<Label>();
+	optTitle->configure(0, 11, 5);
+	optTitle->text("Node Options");
+	optTitle->textAlign(Label::Center);
+	root->add(optTitle);
+
+	Panel* options = gui->create<Panel>();
+	options->configure(1, 11, 5, 6);
+	options->gridWidth(4);
+	options->gridHeight(6);
+	root->add(options);
+
+	Button* newSine = gui->create<Button>();
+	newSine->configure(7, 11, 2);
+	newSine->text("+ Sine");
+	newSine->onClick([&](u8 btn, i32 x, i32 y) {
+		cnv->create<SineWave>();
+	});
+	root->add(newSine);
+	
+	Button* newLFO = gui->create<Button>();
+	newLFO->configure(7, 13, 2);
+	newLFO->text("+ LFO");
+	newLFO->onClick([&](u8 btn, i32 x, i32 y) {
+		cnv->create<LFO>();
+	});
+	root->add(newLFO);
+
+	cnv->onConnect([&]() {
+		vm->setProgram(cnv->system()->compile());
+	});
+
+	cnv->onSelect([&](Node* nd) {
+		optTitle->text("Node Options");
+		options->removeAll();
+
+		//Node* nd = cnv->current();
+		if (nd != nullptr) {
+			if (nd->type() != NodeType::Out) {
+				Button* btnDel = gui->create<Button>();
+				btnDel->onClick([&](u8 btn, i32 x, i32 y) {
+					if (btn == SDL_BUTTON_LEFT) {
+						u32 nid = cnv->selected()[0];
+						Node* nd = cnv->system()->get<Node>(nid);
+						cnv->system()->destroy(nd->id());
+						cnv->deselect();
+					} else {
+						vm->noteOn(36);
+						vm->noteOn(40);
+					}
+				});
+				btnDel->configure(5, 3);
+				btnDel->text("X");
+				options->add(btnDel);
+			}
+
+			u32 row = 0;
+
+			Spinner* level = gui->create<Spinner>();
+			level->configure(row++, 0, 4);
+			level->value(nd->level());
+			level->onChange([&](f32 value) {
+				cnv->current()->level(value);
+			});
+			level->suffix(" Lvl.");
+			level->step(0.01f);
+			options->add(level);
+
+			switch (nd->type()) {
+				case NodeType::Out: optTitle->text("Node Options (Out)"); break;
+				case NodeType::SineWave: optTitle->text("Node Options (Sine)"); break;
+				case NodeType::LFO: {
+					optTitle->text("Node Options (LFO)");
+					Spinner* freq = gui->create<Spinner>();
+					freq->onChange([&](f32 value) {
+						cnv->current()->param(0).value = value;
+					});
+					freq->configure(row++, 0, 4);
+					freq->suffix(" Freq.");
+					freq->minimum(0.01f);
+					freq->maximum(20.0f);
+					freq->value(nd->param(0).value);
+					options->add(freq);
+
+					Spinner* vmin = gui->create<Spinner>();
+					vmin->onChange([&](f32 value) {
+						cnv->current()->param(1).value = value;
+					});
+					vmin->configure(row++, 0, 4);
+					vmin->suffix(" Min.");
+					vmin->minimum(-999.0f);
+					vmin->maximum(9999.0f);
+					vmin->value(nd->param(1).value);
+					vmin->draggable(false);
+					options->add(vmin);
+
+					Spinner* vmax = gui->create<Spinner>();
+					vmax->onChange([&](f32 value) {
+						cnv->current()->param(2).value = value;
+					});
+					vmax->configure(row++, 0, 4);
+					vmax->suffix(" Max.");
+					vmax->minimum(-999.0f);
+					vmax->maximum(9999.0f);
+					vmax->value(nd->param(2).value);
+					vmax->draggable(false);
+					options->add(vmax);
+				} break;
+				default: break;
+			}
 		}
 	});
-	valueNode->configure(2, 12, 4);
-	valueNode->minimum(-9999.0f);
-	valueNode->maximum(9999.0f);
-	valueNode->value(0.0f);
-	valueNode->suffix(" Lvl.");
-	root->add(valueNode);
-
-	Spinner* spnMaster = gui->create<Spinner>();
-	spnMaster->onChange([&]() {
-		cnv->system()->master(spnMaster->value());
-	});
-	spnMaster->configure(0, 12, 4);
-	spnMaster->value(0.5f);
-	spnMaster->suffix(" Vol.");
-	root->add(spnMaster);
-
-	Spinner* spnFreq = gui->create<Spinner>();
-	spnFreq->onChange([&]() {
-		cnv->system()->frequency(spnFreq->value());
-	});
-	spnFreq->configure(1, 12, 4);
-	spnFreq->minimum(20.0f);
-	spnFreq->maximum(2000.0f);
-	spnFreq->value(220.0f);
-	spnFreq->suffix(" Hz");
-	root->add(spnFreq);
 
 	SDL_AudioDeviceID device;
 	SDL_AudioSpec spec;
@@ -92,7 +224,7 @@ int main(int argc, char** argv) {
 	spec.samples = 1024;
 	spec.channels = 2;
 	spec.callback = callback;
-	spec.userdata = cnv->system();
+	spec.userdata = vm.get();
 	spec.format = AUDIO_F32;
 
 	SDL_AudioSpec obspec;
@@ -108,7 +240,7 @@ int main(int argc, char** argv) {
 	while (running) {
 		switch (gui->events()->poll()) {
 			case EventHandler::Status::Quit: running = false; break;
-			case EventHandler::Status::Resize: gui->clear(); break;
+			case EventHandler::Status::Resize: gui->clear(); gui->root()->invalidate(); break;
 			default: break;
 		}
 		int w, h;

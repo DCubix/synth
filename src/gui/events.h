@@ -82,6 +82,8 @@ private:
 	SDL_Event m_event;
 	std::vector<Element*> m_elements;
 	Element* m_focused{ nullptr };
+
+	bool m_elementsChanged{ false };
 };
 
 #endif // SYG_EVENTS_H

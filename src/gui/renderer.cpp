@@ -1,5 +1,7 @@
 #include "renderer.h"
 
+#include <algorithm>
+
 #include "skin.h"
 #include "font.h"
 #include "font_small.h"
@@ -83,7 +85,7 @@ void Renderer::curve(
 	i32 x1, i32 y1, i32 x2, i32 y2, i32 x3, i32 y3, i32 x4, i32 y4,
 	u8 r, u8 g, u8 b, u8 a
 ) {
-	const u32 steps = 32;
+	const u32 steps = 24;
 
 	i32 px = i32(deCasteljau(x1, x2, x3, x4, 0));
 	i32 py = i32(deCasteljau(y1, y2, y3, y4, 0));
@@ -141,13 +143,49 @@ void Renderer::flatPanel(i32 x, i32 y, i32 w, i32 h, i32 sx, i32 sy, f32 shadow)
 	patch(x, y, w, h, 128, 160, TS, TS);
 }
 
-void Renderer::enableClipping(i32 x, i32 y, i32 w, i32 h) {
+void Renderer::pushClipping(i32 x, i32 y, i32 w, i32 h) {
+	// Fix cliprect
+	if (w < 0) {
+		w = -w;
+		x -= w;
+	}
+	if (h < 0) {
+		h = -h;
+		y -= h;
+	}
+
+	if (m_clipRects.empty()) {
+		if (w < 1 || h < 1) return;
+	} else {
+		// Merge
+		SDL_Rect parent = m_clipRects.top();
+		f32 minX = std::max(parent.x, x);
+		f32 maxX = std::min(parent.x + parent.w, x + w);
+		if (maxX - minX < 1) return;
+
+		f32 minY = std::max(parent.y, y);
+		f32 maxY = std::min(parent.y + parent.h, y + h);
+		if (maxY - minY < 1) return;
+
+		x = minX;
+		y = minY;
+		w = i32(maxX - minX);
+		h = i32(std::max(1.0f, maxY - minY));
+	}
+
 	SDL_Rect cr = { x, y, w, h };
+	m_clipRects.push(cr);
 	SDL_RenderSetClipRect(m_ren, &cr);
 }
 
-void Renderer::disableClipping() {
-	SDL_RenderSetClipRect(m_ren, nullptr);
+void Renderer::popClipping() {
+	m_clipRects.top(); m_clipRects.pop();
+	if (m_clipRects.empty()) {
+		SDL_RenderSetClipRect(m_ren, nullptr);
+	} else {
+		SDL_Rect cr = m_clipRects.top();
+		SDL_RenderSetClipRect(m_ren, &cr);
+	}
 }
 
 void Renderer::text(i32 x, i32 y, const std::string& str, u8 r, u8 g, u8 b, u8 a) {

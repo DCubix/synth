@@ -13,5 +13,9 @@ file(GLOB_RECURSE SRC "src/*.h" "src/*.hpp" "src/*.cpp" "src/*.c")
 
 find_package(SDL2 CONFIG REQUIRED)
 
+set(BUILD_SHARED_LIBS CACHE BOOL OFF)
+set(BUILD_TESTING CACHE BOOL OFF)
+add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/rtmidi)
+
 add_executable(${PROJECT_NAME} ${SRC})
-target_link_libraries(${PROJECT_NAME} PRIVATE SDL2::SDL2 SDL2::SDL2main)
+target_link_libraries(${PROJECT_NAME} PRIVATE SDL2::SDL2 SDL2::SDL2main rtmidi)

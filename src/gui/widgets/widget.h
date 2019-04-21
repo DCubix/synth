@@ -22,17 +22,23 @@ public:
 	u32 rowSpan() const { return m_rowSpan; }
 	u32 columnSpan() const { return m_columnSpan; }
 
-	void invalidate() { m_dirty = true; }
+	virtual void invalidate() { m_dirty = true; }
 
 	Widget* parent() { return m_parent; }
 	virtual bool dirty() const { return m_dirty; }
+
+	bool alwaysRedraw() const { return m_alwaysRedraw; }
+	void alwaysRedraw(bool v) { m_alwaysRedraw = v; }
+
+	Element::Rect realBounds() const;
 
 protected:
 	GUI* m_gui;
 	Widget* m_parent{ nullptr };
 
 	bool m_visible{ true },
-		m_dirty{ true };
+		m_dirty{ true },
+		m_alwaysRedraw{ false };
 	u32 m_gridRow{ 0 },
 		m_gridColumn{ 0 },
 		m_rowSpan{ 1 },

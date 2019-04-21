@@ -24,6 +24,10 @@ void GUI::destroy(Widget* widget) {
 		it->reset();
 		m_widgets.erase(it, m_widgets.end());
 	}
+
+	for (auto&& widget : m_widgets) {
+		widget->invalidate();
+	}
 	m_clear = true;
 }
 
@@ -46,24 +50,21 @@ void GUI::render(i32 width, i32 height) {
 
 	if (m_clear) {
 		SDL_RenderClear(m_renderer->sdlRenderer());
-		for (auto&& widget : m_widgets) {
-			widget->m_dirty = true;
-		}
 		m_clear = false;
 	}
 
 	for (auto&& widget : m_widgets) {
 		auto b = widget->bounds();
 		if (widget->parent() == nullptr) {
-			m_renderer->enableClipping(b.x, b.y, b.width, b.height);
+			m_renderer->pushClipping(b.x, b.y, b.width, b.height);
 		}
 
-		if (widget->m_dirty && widget->visible()) {
+		if ((widget->m_dirty || widget->alwaysRedraw()) && widget->visible()) {
 			widget->onDraw(*m_renderer.get());
 			widget->m_dirty = false;
 		}
 		if (widget->parent() == nullptr) {
-			m_renderer->disableClipping();
+			m_renderer->popClipping();
 		}
 	}
 }

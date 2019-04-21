@@ -2,6 +2,7 @@
 #define SYG_RENDERER_H
 
 #include <string>
+#include <stack>
 
 #include "../common.h"
 #include "../sdl2.h"
@@ -26,8 +27,8 @@ public:
 	void check(i32 x, i32 y, bool state);
 	void flatPanel(i32 x, i32 y, i32 w, i32 h, i32 sx = 0, i32 sy = 0, f32 shadow = 0.0f);
 
-	void enableClipping(i32 x, i32 y, i32 w, i32 h);
-	void disableClipping();
+	void pushClipping(i32 x, i32 y, i32 w, i32 h);
+	void popClipping();
 
 	void text(i32 x, i32 y, const std::string& str, u8 r, u8 g, u8 b, u8 a = 0xFF);
 	void textSmall(i32 x, i32 y, const std::string& str, u8 r, u8 g, u8 b, u8 a = 0xFF);
@@ -40,6 +41,8 @@ private:
 	SDL_Texture *m_skin, *m_font, *m_fontSmall;
 	u32 m_fontWidth, m_fontHeight;
 	u32 m_fontSmallWidth, m_fontSmallHeight;
+
+	std::stack<SDL_Rect> m_clipRects;
 
 	void skin(
 		i32 x, i32 y, i32 w, i32 h,

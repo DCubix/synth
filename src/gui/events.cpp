@@ -13,12 +13,15 @@ bool Element::hits(i32 x, i32 y) {
 
 void EventHandler::subscribe(Element* element) {
 	m_elements.push_back(element);
+	m_elementsChanged = true;
 }
 
 void EventHandler::unsubscribe(Element* element) {
 	auto it = std::find(m_elements.begin(), m_elements.end(), element);
 	if (it != m_elements.end()) {
 		m_elements.erase(it);
+		m_elementsChanged = true;
+		m_focused = nullptr;
 	}
 }
 
@@ -40,6 +43,10 @@ EventHandler::Status EventHandler::poll() {
 						if (m_focused != nullptr) {
 							m_focused->onBlur();
 							m_focused->m_focused = false;
+							if (m_elementsChanged) {
+								m_elementsChanged = false;
+								break;
+							}
 						}
 						m_focused = el;
 
@@ -52,6 +59,10 @@ EventHandler::Status EventHandler::poll() {
 							el->onPress(m_event.button.button, x - el->bounds().x, y - el->bounds().y);
 						} else {
 							el->onPress(m_event.button.button, x - el->bounds().x, y - el->bounds().y);
+						}
+						if (m_elementsChanged) {
+							m_elementsChanged = false;
+							break;
 						}
 					}
 					//if (cont) break;
@@ -71,6 +82,10 @@ EventHandler::Status EventHandler::poll() {
 							el->onClick(m_event.button.button, x - el->bounds().x, y - el->bounds().y);
 						}
 						el->onRelease(m_event.button.button, x - el->bounds().x, y - el->bounds().y);
+						if (m_elementsChanged) {
+							m_elementsChanged = false;
+							break;
+						}
 					}
 
 					el->m_clicked = false;
@@ -97,6 +112,10 @@ EventHandler::Status EventHandler::poll() {
 						}
 						el->onMove(x - el->bounds().x, y - el->bounds().y);
 						el->m_hovered = true;
+						if (m_elementsChanged) {
+							m_elementsChanged = false;
+							break;
+						}
 					}
 				}
 			} break;
@@ -127,6 +146,7 @@ EventHandler::Status EventHandler::poll() {
 					case SDL_WINDOWEVENT_MAXIMIZED:
 					case SDL_WINDOWEVENT_RESTORED:
 					case SDL_WINDOWEVENT_MINIMIZED:
+					case SDL_WINDOWEVENT_FOCUS_GAINED:
 						status = Resize;
 						break;
 				}
