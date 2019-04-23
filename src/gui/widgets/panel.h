@@ -4,9 +4,12 @@
 #include <memory>
 
 #include "widget.h"
+#include "../layout.h"
 
 class Panel : public Widget {
 public:
+	Panel();
+
 	virtual void onDraw(Renderer& renderer) override;
 
 	void add(Widget* widget);
@@ -24,10 +27,13 @@ public:
 	u32 spacing() const { return m_spacing; }
 	void spacing(u32 v) { m_spacing = v; }
 
+	void setLayout(Layout* layout);
+
 	void removeAll();
 	virtual void invalidate() override;
 
 private:
+	std::unique_ptr<Layout> m_layout;
 	std::vector<Widget*> m_children;
 	u32 m_gridWidth{ 2 }, // # of columns
 		m_gridHeight{ 2 }, // # of rows

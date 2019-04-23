@@ -1,6 +1,7 @@
 #include "renderer.h"
 
 #include <algorithm>
+#include <cmath>
 
 #include "skin.h"
 #include "font.h"
@@ -76,10 +77,10 @@ void Renderer::line(i32 x1, i32 y1, i32 x2, i32 y2, u8 r, u8 g, u8 b, u8 a, u8 w
 }
 
 static f32 deCasteljau(f32 a, f32 b, f32 c, f32 d, f32 t) {
-	return std::powf(1.0f - t, 3)* a +
-		3.0f * std::powf(1.0f - t, 2) * t * b +
-		3.0f * (1.0f - t) * std::powf(t, 2) * c +
-		std::powf(t, 3) * d;
+	return std::pow(1.0f - t, 3)* a +
+		3.0f * std::pow(1.0f - t, 2) * t * b +
+		3.0f * (1.0f - t) * std::pow(t, 2) * c +
+		std::pow(t, 3) * d;
 }
 
 void Renderer::curve(

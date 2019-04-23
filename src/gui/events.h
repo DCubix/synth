@@ -35,6 +35,9 @@ public:
 	virtual void onBlur() { if (m_onBlur) m_onBlur(); }
 
 	Rect& bounds() { return m_bounds; }
+	Rect realBounds() const;
+
+	Element* parent() { return m_parent; }
 
 	bool enabled() const { return m_enabled; }
 	void enabled(bool v) { m_enabled = v; }
@@ -54,6 +57,8 @@ public:
 	SY__LAZY_CB(KeyRelease, (u32, u32))
 
 protected:
+	Element* m_parent{ nullptr };
+
 	std::function<void(i32, i32)> m_onMove;
 	std::function<void(u8, i32, i32)> m_onClick, m_onDoubleClick, m_onPress, m_onRelease;
 	std::function<void(i8)> m_onScroll;

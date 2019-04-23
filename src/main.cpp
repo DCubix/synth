@@ -107,74 +107,103 @@ int main(int argc, char** argv) {
 	
 	GUI* gui = new GUI(ren);
 	Panel* root = gui->root();
-	root->gridHeight(20);
+	root->setLayout(new BorderLayout());
+	root->spacing(4);
+	root->padding(4);
 	
 	NodeCanvas* cnv = gui->create<NodeCanvas>();
-	cnv->configure(0, 0, 11, 17);
+	cnv->layoutParam(BorderLayoutPosition::Center);
 	root->add(cnv);
 
+	Panel* sidePanel = gui->create<Panel>();
+	sidePanel->setLayout(new BorderLayout());
+	sidePanel->layoutParam(BorderLayoutPosition::Right);
+	sidePanel->bounds().width = 200;
+	root->add(sidePanel);
+
 	Label* optTitle = gui->create<Label>();
-	optTitle->configure(0, 11, 5);
+	optTitle->layoutParam(BorderLayoutPosition::Top);
+	optTitle->bounds().height = 22;
 	optTitle->text("Node Options");
 	optTitle->textAlign(Label::Center);
-	root->add(optTitle);
+	sidePanel->add(optTitle);
+
+	Panel* optionsPanel = gui->create<Panel>();
+	optionsPanel->padding(0);
+	optionsPanel->spacing(0);
+	optionsPanel->setLayout(new BorderLayout());
+	optionsPanel->layoutParam(BorderLayoutPosition::Center);
+	sidePanel->add(optionsPanel);
+
+	Panel* nodeButtonsPanel = gui->create<Panel>();
+	nodeButtonsPanel->layoutParam(BorderLayoutPosition::Bottom);
+	nodeButtonsPanel->bounds().height = 48;
+	nodeButtonsPanel->gridWidth(6);
+	nodeButtonsPanel->gridHeight(2);
+	optionsPanel->add(nodeButtonsPanel);
 
 	Panel* options = gui->create<Panel>();
-	options->configure(1, 11, 5, 6);
-	options->gridWidth(4);
-	options->gridHeight(8);
-	root->add(options);
+	options->setLayout(new StackLayout());
+	options->layoutParam(BorderLayoutPosition::Center);
+	optionsPanel->add(options);
+
+	Panel* buttonsPanel = gui->create<Panel>();
+	buttonsPanel->layoutParam(BorderLayoutPosition::Bottom);
+	buttonsPanel->bounds().height = 256;
+	buttonsPanel->gridWidth(6);
+	buttonsPanel->gridHeight(4);
+	sidePanel->add(buttonsPanel);
 
 	Button* newSine = gui->create<Button>();
-	newSine->configure(7, 11, 2);
-	newSine->text("+ Sine");
+	newSine->configure(0, 0, 2);
+	newSine->text("Sine");
 	newSine->onClick([&](u8 btn, i32 x, i32 y) {
 		cnv->create<SineWave>();
 	});
-	root->add(newSine);
+	buttonsPanel->add(newSine);
 	
 	Button* newLFO = gui->create<Button>();
-	newLFO->configure(7, 13, 2);
-	newLFO->text("+ LFO");
+	newLFO->configure(0, 2, 2);
+	newLFO->text("LFO");
 	newLFO->onClick([&](u8 btn, i32 x, i32 y) {
 		cnv->create<LFO>();
 	});
-	root->add(newLFO);
+	buttonsPanel->add(newLFO);
 
 	Button* newADSR = gui->create<Button>();
-	newADSR->configure(8, 11, 2);
-	newADSR->text("+ ADSR");
+	newADSR->configure(0, 4, 2);
+	newADSR->text("ADSR");
 	newADSR->onClick([&](u8 btn, i32 x, i32 y) {
 		cnv->create<ADSRNode>();
 	});
-	root->add(newADSR);
+	buttonsPanel->add(newADSR);
 
 	Button* newMap = gui->create<Button>();
-	newMap->configure(8, 13, 2);
-	newMap->text("+ Map");
+	newMap->configure(1, 0, 2);
+	newMap->text("Map");
 	newMap->onClick([&](u8 btn, i32 x, i32 y) {
 		cnv->create<Map>();
 	});
-	root->add(newMap);
+	buttonsPanel->add(newMap);
 
 	Button* newReader = gui->create<Button>();
-	newReader->configure(9, 11, 2);
-	newReader->text("+ Reader");
+	newReader->configure(1, 2, 2);
+	newReader->text("Reader");
 	newReader->onClick([&](u8 btn, i32 x, i32 y) {
 		cnv->create<Reader>();
 	});
-	root->add(newReader);
+	buttonsPanel->add(newReader);
 
 	Button* newWriter = gui->create<Button>();
-	newWriter->configure(9, 13, 2);
-	newWriter->text("+ Writer");
+	newWriter->configure(1, 4, 2);
+	newWriter->text("Writer");
 	newWriter->onClick([&](u8 btn, i32 x, i32 y) {
 		cnv->create<Writer>();
 	});
-	root->add(newWriter);
+	buttonsPanel->add(newWriter);
 
 	Keyboard* kb = gui->create<Keyboard>();
-	kb->configure(17, 0, root->gridWidth(), 3);
+	kb->layoutParam(BorderLayoutPosition::Bottom);
 	root->add(kb);
 
 	kb->onNoteOn([&](i32 note, f32 vel) {
@@ -192,6 +221,7 @@ int main(int argc, char** argv) {
 	cnv->onSelect([&](Node* nd) {
 		optTitle->text("Node Options");
 		options->removeAll();
+		nodeButtonsPanel->removeAll();
 
 		//Node* nd = cnv->current();
 		if (nd != nullptr) {
@@ -208,9 +238,9 @@ int main(int argc, char** argv) {
 						vm->noteOn(40);
 					}
 				});
-				btnDel->configure(5, 3);
+				btnDel->configure(0, 5, 1, 2);
 				btnDel->text("X");
-				options->add(btnDel);
+				nodeButtonsPanel->add(btnDel);
 			}
 
 			u32 row = 0;
@@ -362,18 +392,36 @@ int main(int argc, char** argv) {
 
 	SDL_PauseAudioDevice(device, 0);
 
+	const double timeStep = 1.0 / 30.0;
+	double lastTime = double(SDL_GetTicks()) / 1000.0;
+	double accum = 0.0;
+
 	SDL_StartTextInput();
 	bool running = true;
 	while (running) {
+		bool canRender = false;
+		double current = double(SDL_GetTicks()) / 1000.0;
+		double delta = current - lastTime;
+		lastTime = current;
+		accum += delta;
+
 		switch (gui->events()->poll()) {
 			case EventHandler::Status::Quit: running = false; break;
 			case EventHandler::Status::Resize: gui->clear(); gui->root()->invalidate(); break;
 			default: break;
 		}
-		int w, h;
-		SDL_GetWindowSize(win, &w, &h);
-		gui->render(w, h);
-		SDL_RenderPresent(ren);
+
+		while (accum > timeStep) {
+			accum -= timeStep;
+			canRender = true;
+		}
+
+		if (canRender) {
+			int w, h;
+			SDL_GetWindowSize(win, &w, &h);
+			gui->render(w, h);
+			SDL_RenderPresent(ren);
+		}
 	}
 
 	SDL_DestroyRenderer(ren);

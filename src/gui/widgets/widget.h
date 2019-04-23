@@ -24,17 +24,17 @@ public:
 
 	virtual void invalidate() { m_dirty = true; }
 
-	Widget* parent() { return m_parent; }
 	virtual bool dirty() const { return m_dirty; }
 
 	bool alwaysRedraw() const { return m_alwaysRedraw; }
 	void alwaysRedraw(bool v) { m_alwaysRedraw = v; }
 
-	Element::Rect realBounds() const;
+	u32 layoutParam() const { return m_layoutParam; }
+	void layoutParam(u32 v) { m_layoutParam = v; invalidate(); }
 
 protected:
 	GUI* m_gui;
-	Widget* m_parent{ nullptr };
+	u32 m_layoutParam{ 0 };
 
 	bool m_visible{ true },
 		m_dirty{ true },

@@ -7,7 +7,7 @@ void Check::onClick(u8 button, i32 x, i32 y) {
 }
 
 void Check::onDraw(Renderer& renderer) {
-	auto b = bounds();
+	auto b = realBounds();
 	renderer.pushClipping(b.x, b.y, b.width, b.height);
 	renderer.check(b.x, b.y + (b.height / 2 - 8), m_checked);
 	renderer.text(b.x + 19, b.y + (b.height / 2 - 6) + 1, m_text, 0, 0, 0, 128);

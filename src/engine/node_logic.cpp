@@ -346,7 +346,7 @@ Voice::Voice() {
 
 void Voice::setNote(u32 note) {
 	m_note = note;
-	m_vm->frequency(440.0f * std::powf(2.0f, (note - 69.0f) / 12.0f));
+	m_vm->frequency(440.0f * std::pow(2.0f, (note - 69.0f) / 12.0f));
 }
 
 Sample Voice::sample(f32 sampleRate) {

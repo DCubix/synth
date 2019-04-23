@@ -17,7 +17,7 @@ static u32 inY(u32 index) {
 }
 
 void NodeCanvas::onDraw(Renderer& renderer) {
-	auto b = bounds();
+	auto b = realBounds();
 	renderer.panel(b.x, b.y, b.width, b.height);
 	renderer.rect(b.x, b.y, b.width, b.height, 0, 0, 0, 70, true);
 

@@ -15,7 +15,7 @@ Spinner::Spinner() {
 }
 
 void Spinner::onDraw(Renderer& renderer) {
-	auto b = bounds();
+	auto b = realBounds();
 
 	f32 vnorm = (m_value - m_min) / (m_max - m_min);
 

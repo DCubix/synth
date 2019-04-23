@@ -1,6 +1,7 @@
 #include "label.h"
 
 void Label::onDraw(Renderer& renderer) {
+	bounds().height = 22;
 	auto b = realBounds();	
 	i32 tw = renderer.textWidth(m_text)+1;
 	i32 tx = 0;

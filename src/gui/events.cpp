@@ -5,10 +5,11 @@
 #include "../log/log.h"
 
 bool Element::hits(i32 x, i32 y) {
-	return x >= m_bounds.x &&
-		x <= m_bounds.x + m_bounds.width &&
-		y >= m_bounds.y &&
-		y <= m_bounds.y + m_bounds.height;
+	auto b = realBounds();
+	return x >= b.x &&
+		x <= b.x + b.width &&
+		y >= b.y &&
+		y <= b.y + b.height;
 }
 
 void EventHandler::subscribe(Element* element) {
@@ -23,6 +24,14 @@ void EventHandler::unsubscribe(Element* element) {
 		m_elementsChanged = true;
 		m_focused = nullptr;
 	}
+}
+
+Element::Rect Element::realBounds() const {
+	Element::Rect rb{ 0, 0, 0, 0 };
+	if (m_parent != nullptr) {
+		rb = m_parent->realBounds();
+	}
+	return { rb.x + m_bounds.x, rb.y + m_bounds.y, m_bounds.width, m_bounds.height };
 }
 
 EventHandler::Status EventHandler::poll() {

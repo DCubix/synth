@@ -8,7 +8,7 @@ Button::Button() {
 void Button::onDraw(Renderer& renderer) {
 	if (!enabled()) m_state = State::Disabled;
 
-	auto b = bounds();
+	auto b = realBounds();
 	renderer.button(b.x, b.y, b.width, b.height, u32(m_state));
 
 	renderer.pushClipping(b.x, b.y, b.width, b.height);
