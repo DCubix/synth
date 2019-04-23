@@ -12,7 +12,7 @@ public:
 	Renderer(SDL_Renderer* ren);
 	~Renderer();
 
-	void line(i32 x1, i32 y1, i32 x2, i32 y2, u8 r, u8 g, u8 b, u8 a = 0xFF);
+	void line(i32 x1, i32 y1, i32 x2, i32 y2, u8 r, u8 g, u8 b, u8 a = 0xFF, u8 width = 1);
 	void curve(
 		i32 x1, i32 y1,
 		i32 x2, i32 y2,
@@ -21,6 +21,7 @@ public:
 		u8 r, u8 g, u8 b, u8 a = 0xFF
 	);
 	void rect(i32 x, i32 y, i32 w, i32 h, u8 r, u8 g, u8 b, u8 a = 0xFF, bool fill = false);
+	void triangle(i32 x1, i32 y1, i32 x2, i32 y2, i32 x3, i32 y3, u8 r, u8 g, u8 b, u8 a = 0xFF);
 
 	void panel(i32 x, i32 y, i32 w, i32 h, i32 sx = 0, i32 sy = 0, f32 shadow = 0.0f);
 	void button(i32 x, i32 y, i32 w, i32 h, u32 state = 0);
@@ -33,6 +34,8 @@ public:
 	void text(i32 x, i32 y, const std::string& str, u8 r, u8 g, u8 b, u8 a = 0xFF);
 	void textSmall(i32 x, i32 y, const std::string& str, u8 r, u8 g, u8 b, u8 a = 0xFF);
 	u32 textWidth(const std::string& str) const { return str.size() * 8; }
+
+	void patch(i32 x, i32 y, i32 w, i32 h, i32 sx, i32 sy, i32 sw, i32 sh, u32 pad = 5, i32 tpad = -1);
 
 	SDL_Renderer* sdlRenderer() { return m_ren; }
 
@@ -48,8 +51,6 @@ private:
 		i32 x, i32 y, i32 w, i32 h,
 		i32 sx, i32 sy, i32 sw, i32 sh
 	);
-
-	void patch(i32 x, i32 y, i32 w, i32 h, i32 sx, i32 sy, i32 sw, i32 sh, u32 pad=5, i32 tpad=-1);
 
 	void textGen(SDL_Texture* font, i32 fw, i32 fh, i32 x, i32 y, const std::string& str, u8 r, u8 g, u8 b, u8 a);
 	void putChar(SDL_Texture* font, i32 fw, i32 fh, i32 x, i32 y, char c, u8 r, u8 g, u8 b, u8 a = 0xFF);

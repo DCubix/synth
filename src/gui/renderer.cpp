@@ -7,6 +7,8 @@
 #include "font_small.h"
 #include "stb_image.h"
 
+#include "SDL2_gfxPrimitives.h"
+
 #define MAX_SHADOW 32.0f
 
 Renderer::Renderer(SDL_Renderer* ren)
@@ -63,15 +65,14 @@ Renderer::Renderer(SDL_Renderer* ren)
 }
 
 Renderer::~Renderer() {
-	/*if (m_skin) {
-		SDL_DestroyTexture(m_skin);
-		m_skin = nullptr;
-	}*/
 }
 
-void Renderer::line(i32 x1, i32 y1, i32 x2, i32 y2, u8 r, u8 g, u8 b, u8 a) {
-	SDL_SetRenderDrawColor(m_ren, r, g, b, a);
-	SDL_RenderDrawLine(m_ren, x1, y1, x2, y2);
+void Renderer::line(i32 x1, i32 y1, i32 x2, i32 y2, u8 r, u8 g, u8 b, u8 a, u8 width) {
+	if (width == 1) {
+		aalineRGBA(m_ren, x1, y1, x2, y2, r, g, b, a);
+	} else {
+		thickLineRGBA(m_ren, x1, y1, x2, y2, width, r, g, b, a);
+	}
 }
 
 static f32 deCasteljau(f32 a, f32 b, f32 c, f32 d, f32 t) {
@@ -85,18 +86,9 @@ void Renderer::curve(
 	i32 x1, i32 y1, i32 x2, i32 y2, i32 x3, i32 y3, i32 x4, i32 y4,
 	u8 r, u8 g, u8 b, u8 a
 ) {
-	const u32 steps = 24;
-
-	i32 px = i32(deCasteljau(x1, x2, x3, x4, 0));
-	i32 py = i32(deCasteljau(y1, y2, y3, y4, 0));
-	for (u32 i = 1; i <= steps; i++) {
-		f32 t = f32(i) / f32(steps);
-		i32 x = i32(deCasteljau(x1, x2, x3, x4, t));
-		i32 y = i32(deCasteljau(y1, y2, y3, y4, t));
-		line(px, py, x, y, r, g, b, a);
-		px = x;
-		py = y;
-	}
+	Sint16 vx[] = { x1, x2, x3, x4 };
+	Sint16 vy[] = { y1, y2, y3, y4 };
+	bezierRGBA(m_ren, vx, vy, 4, 5, r, g, b, a);
 }
 
 void Renderer::rect(i32 x, i32 y, i32 w, i32 h, u8 r, u8 g, u8 b, u8 a, bool fill) {
@@ -104,6 +96,10 @@ void Renderer::rect(i32 x, i32 y, i32 w, i32 h, u8 r, u8 g, u8 b, u8 a, bool fil
 	SDL_Rect rec = { x, y, w, h };
 	if (fill) SDL_RenderFillRect(m_ren, &rec);
 	else      SDL_RenderDrawRect(m_ren, &rec);
+}
+
+void Renderer::triangle(i32 x1, i32 y1, i32 x2, i32 y2, i32 x3, i32 y3, u8 r, u8 g, u8 b, u8 a) {
+	filledTrigonRGBA(m_ren, x1, y1, x2, y2, x3, y3, r, g, b, a);
 }
 
 void Renderer::panel(i32 x, i32 y, i32 w, i32 h, i32 sx, i32 sy, f32 shadow) {
@@ -179,7 +175,9 @@ void Renderer::pushClipping(i32 x, i32 y, i32 w, i32 h) {
 }
 
 void Renderer::popClipping() {
-	m_clipRects.top(); m_clipRects.pop();
+	if (!m_clipRects.empty()) {
+		m_clipRects.pop();
+	}
 	if (m_clipRects.empty()) {
 		SDL_RenderSetClipRect(m_ren, nullptr);
 	} else {

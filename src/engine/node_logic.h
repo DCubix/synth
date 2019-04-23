@@ -12,7 +12,12 @@
 
 #include "../common.h"
 #include "phase.h"
+#include "adsr.h"
 #include "../log/log.h"
+
+extern "C" {
+#include "../../sndfilter/src/compressor.h"
+}
 
 constexpr u32 SynMaxNodes = 256;
 constexpr u32 SynMaxConnections = 512;
@@ -26,7 +31,11 @@ enum OpCode {
 	OpPushPtr,
 	OpSine,
 	OpLFO,
-	OpOut
+	OpOut,
+	OpADSR,
+	OpMap,
+	OpWrite,
+	OpRead
 };
 
 struct Instruction {
@@ -47,6 +56,10 @@ public:
 	inline ProgramBuilder& sine() { m_program.push_back({ OpSine, 0 }); return *this; }
 	inline ProgramBuilder& lfo() { m_program.push_back({ OpLFO, 0 }); return *this; }
 	inline ProgramBuilder& out() { m_program.push_back({ OpOut, 0 }); return *this; }
+	inline ProgramBuilder& adsr() { m_program.push_back({ OpADSR, 0 }); return *this; }
+	inline ProgramBuilder& map() { m_program.push_back({ OpMap, 0 }); return *this; }
+	inline ProgramBuilder& read() { m_program.push_back({ OpRead, 0 }); return *this; }
+	inline ProgramBuilder& write() { m_program.push_back({ OpWrite, 0 }); return *this; }
 
 	Program build() const { return m_program; }
 
@@ -59,23 +72,26 @@ public:
 	SynthVM();
 
 	void load(const Program& program);
-	Sample execute();
-
-	f32 sampleRate() const { return m_sampleRate; }
+	Sample execute(f32 sampleRate);
 
 	f32 frequency() const { return m_frequency; }
 	void frequency(f32 v) { m_frequency = v; }
 
+	std::array<ADSR, 128>& envelopes() { return m_envs; }
+	u32 usedEnvelopes() const { return m_usedEnvs; }
+
 private:
 	f32 m_frequency{ 220.0f };
-	f32 m_sampleRate{ 44100.0f };
 
-	std::vector<f32> m_stack;
+	util::Stack<f32, 1024> m_stack{};
 
 	Program m_program;
 	Sample m_out{ 0.0f, 0.0f };
 
-	std::array<Phase, SynMaxNodes> m_phases;
+	std::array<Phase, 128> m_phases;
+	std::array<ADSR, 128> m_envs;
+	std::array<f32, 32> m_storage;
+	u32 m_usedEnvs{ 0 };
 
 	std::mutex m_lock;
 };
@@ -83,33 +99,43 @@ private:
 class Voice {
 	friend class Synth;
 public:
+	Voice();
+
 	void setNote(u32 note);
 
 	bool active() const { return m_active; }
 	void free() { m_active = false; }
 
-	Sample sample();
-	SynthVM& vm() { return m_vm; }
+	Sample sample(f32 sampleRate);
+	SynthVM& vm() { return *m_vm.get(); }
 
 protected:
-	SynthVM m_vm{};
+	std::unique_ptr<SynthVM> m_vm;
 	u32 m_note;
 	f32 m_velocity{ 0.0f };
-	bool m_active;
+	bool m_active{ false };
 };
 
 class Synth {
 public:
+	Synth();
+
 	void noteOn(u32 noteNumber, f32 velocity = 1.0f);
 	void noteOff(u32 noteNumber, f32 velocity = 1.0f);
 	Sample sample();
 
 	void setProgram(const Program& program);
 
+	f32 sampleRate() const { return m_sampleRate; }
+
 private:
-	std::array<Voice, SynMaxVoices> m_voices;
+	std::array< std::unique_ptr<Voice>, SynMaxVoices> m_voices;
 	Voice* findFreeVoice();
 	Program m_program;
+
+	f32 m_sampleRate{ 44100.0f };
+
+	sf_compressor_state_st m_compressor;
 };
 
 enum class NodeType {
@@ -117,7 +143,11 @@ enum class NodeType {
 	Value,
 	Out,
 	SineWave,
-	LFO
+	LFO,
+	ADSR,
+	Map,
+	Writer,
+	Reader
 };
 
 class NodeSystem;
@@ -131,9 +161,6 @@ public:
 
 	Node() = default;
 	~Node() = default;
-
-	virtual f32 sample(NodeSystem* system) = 0;
-	virtual Program build() = 0;
 
 	virtual NodeType type() { return NodeType::None; }
 
@@ -150,15 +177,9 @@ public:
 
 	u32 paramCount() const { return m_params.size(); }
 
-	f32 vu();
-
 protected:
-	void update(f32 val);
-	bool solved{ false };
-
 	f32 m_level{ 1.0f };
-	std::array<f32, 512> m_buffer;
-	u32 m_id{ 0 }, m_bufferPtr{ 0 };
+	u32 m_id{ 0 };
 
 	std::vector<Param> m_params;
 	std::vector<std::string> m_paramNames;
@@ -168,9 +189,6 @@ using NodePtr = std::unique_ptr<Node>;
 class Output : public Node {
 public:
 	Output();
-
-	f32 sample(NodeSystem* system);
-	virtual Program build() override;
 
 	virtual NodeType type() { return NodeType::Out; }
 
@@ -223,14 +241,10 @@ public:
 	u32 connect(u32 src, u32 dest, u32 param);
 	void disconnect(u32 connection);
 	u32 getConnection(u32 dest, u32 param);
+	std::vector<u32> getConnections(u32 dest, u32 param);
+	std::vector<u32> getAllConnections(u32 node);
 
-	Sample sample();
 	Program compile();
-
-	f32 sampleRate() const { return m_sampleRate; }
-
-	f32 frequency() const { return m_frequency; }
-	void frequency(f32 v) { m_frequency = v; }
 
 	std::vector<u32> nodes() { return m_usedNodes; }
 	std::vector<u32> connections() { return m_usedConnections; }
@@ -251,8 +265,6 @@ private:
 	std::array<f32, SynMaxNodes> m_nodeBuffer;
 
 	std::mutex m_lock;
-
-	f32 m_sampleRate, m_frequency;
 };
 
 #endif // SYE_NODE_H

@@ -5,6 +5,9 @@
 
 #include "sine_wave.hpp"
 #include "lfo.hpp"
+#include "adsr_node.hpp"
+#include "remap.hpp"
+#include "storage.hpp"
 
 void Node::addParam(const std::string& name) {
 	m_paramNames.push_back(name);
@@ -19,17 +22,7 @@ std::string Node::paramName(u32 id) {
 	return m_paramNames[id];
 }
 
-f32 Node::vu() {
-	return (std::accumulate(m_buffer.begin(), m_buffer.end(), 0.0f) / m_buffer.size()) * 0.5f + 0.5f;
-}
-
-void Node::update(f32 val) {
-	m_buffer[(m_bufferPtr++) % m_buffer.size()] = val;
-}
-
 NodeSystem::NodeSystem() {
-	m_sampleRate = 44100.0f;
-	m_frequency = 220.0f;
 	m_nodeBuffer.fill(0.0f);
 	create<Output>();
 }
@@ -37,6 +30,9 @@ NodeSystem::NodeSystem() {
 void NodeSystem::destroy(u32 id) {
 	auto pos = std::find(m_usedNodes.begin(), m_usedNodes.end(), id);
 	if (pos == m_usedNodes.end()) return;
+	for (u32 cid : getAllConnections(id)) {
+		disconnect(cid);
+	}
 	m_lock.lock();
 	m_usedNodes.erase(pos);
 	m_nodes[id].reset();
@@ -97,79 +93,68 @@ u32 NodeSystem::getConnection(u32 dest, u32 param) {
 	return UINT32_MAX;
 }
 
-Sample NodeSystem::sample() {
-	std::vector<u32> broken;
-
-	// "Dirtying" step
-	for (u32 nid : m_usedNodes) {
-		Node* node = m_nodes[nid].get();
-		if (node == nullptr) continue;
-		node->solved = false;
-	}
-
-	// Solving step
+std::vector<u32> NodeSystem::getConnections(u32 dest, u32 param) {
+	std::vector<u32> res;
 	for (u32 cid : m_usedConnections) {
 		Connection* conn = m_connections[cid].get();
-		if (conn == nullptr) { // it's a broken connection!
-			broken.push_back(cid);
-			continue;
-		}
-
-		Node* src  = m_nodes[conn->src].get();
-		Node* dest = m_nodes[conn->dest].get();
-		if (src == nullptr || dest == nullptr) { // it's a broken connection!
-			broken.push_back(cid);
-			continue;
-		}
-
-		// Solve
-		if (!src->solved) { // to prevent from solving twice
-			m_nodeBuffer[conn->src] = src->sample(this) * src->level();
-			src->update(m_nodeBuffer[conn->src]);
-			src->solved = true;
+		if (conn->dest == dest && conn->destParam == param) {
+			res.push_back(cid);
 		}
 	}
+	return res;
+}
 
-	// Cleanup step
-	for (u32 conn : broken) {
-		disconnect(conn);
-	}
-
-	// Assignment step
+std::vector<u32> NodeSystem::getAllConnections(u32 node) {
+	std::vector<u32> res;
 	for (u32 cid : m_usedConnections) {
 		Connection* conn = m_connections[cid].get();
-		Node* src  = m_nodes[conn->src].get();
-		Node* dest = m_nodes[conn->dest].get();
-		
-		dest->param(conn->destParam).value = m_nodeBuffer[src->m_id];
-
-		if (!dest->solved) {
-			m_nodeBuffer[conn->dest] = dest->sample(this) * dest->level();
-			dest->solved = true;
+		if (conn->dest == node || conn->src == node) {
+			res.push_back(cid);
 		}
 	}
-
-	// Return the Output node's value
-	auto out = get<Output>(0);
-	if (!out) return { 0.0f, 0.0f };
-	return {
-		m_nodeBuffer[0] * (1.0f - out->pan()),
-		m_nodeBuffer[0] * out->pan()
-	};
-
+	return res;
 }
 
 static void process(NodeSystem* sys, Node* node, ProgramBuilder& out) {
 	auto type = node->type();
+
+	switch (type) {
+		case NodeType::ADSR: {
+			ADSRNode* an = (ADSRNode*)node;
+			out.pushp(&an->a);
+			out.pushp(&an->d);
+			out.pushp(&an->s);
+			out.pushp(&an->r);
+		} break;
+		case NodeType::Map: {
+			Map* mn = (Map*)node;
+			out.pushp(&mn->fromMin);
+			out.pushp(&mn->fromMax);
+			out.pushp(&mn->toMin);
+			out.pushp(&mn->toMax);
+		} break;
+		case NodeType::Reader: {
+			Reader* mn = (Reader*)node;
+			out.pushp(&mn->channel);
+		} break;
+		case NodeType::Writer: {
+			Writer* mn = (Writer*)node;
+			out.pushp(&mn->channel);
+		} break;
+		default: break;
+	}
+
 	for (u32 i = 0; i < node->paramCount(); i++) {
 		if (!node->param(i).connected) {
 			out.pushp(&node->param(i).value);
 		} else {
-			u32 cid = sys->getConnection(node->id(), i);
-			auto conn = sys->getConnection(cid);
-			if (conn) {
-				Node* nd = sys->get<Node>(conn->src);
-				process(sys, nd, out);
+			auto&& conns = sys->getConnections(node->id(), i);
+			for (u32 cid : conns) {
+				auto conn = sys->getConnection(cid);
+				if (conn) {
+					Node* nd = sys->get<Node>(conn->src);
+					process(sys, nd, out);
+				}
 			}
 		}
 	}
@@ -178,6 +163,10 @@ static void process(NodeSystem* sys, Node* node, ProgramBuilder& out) {
 		case NodeType::LFO: out.lfo(); break;
 		case NodeType::SineWave: out.sine(); break;
 		case NodeType::Out: out.out(); break;
+		case NodeType::ADSR: out.adsr(); break;
+		case NodeType::Map: out.map(); break;
+		case NodeType::Reader: out.read(); break;
+		case NodeType::Writer: out.write(); break;
 		default: break;
 	}
 }
@@ -221,7 +210,6 @@ std::vector<u32> NodeSystem::buildNodes(const std::vector<u32>& nodes) {
 
 				if (std::find(nodesg.begin(), nodesg.end(), rnd) == nodesg.end()) {
 					nodesg.push_back(rnd);
-					LogI("New node found. ", rnd);
 				}
 			}
 		}
@@ -236,48 +224,15 @@ std::vector<u32> NodeSystem::buildNodes(u32 node) {
 	return buildNodes(ret);
 }
 
-f32 Output::sample(NodeSystem* system) {
-	return param(0).value;
-}
-
-Program Output::build() {
-	return ProgramBuilder()
-		.pushp(&m_level)
-		.out()
-		.build();
-}
-
 Output::Output() {
 	addParam("Out");
 	addParam("Pan");
 	param(1).value = 0.5f;
 }
 
-static const f32 NOTE[] = {
-	27.50f,
-	29.14f,
-	30.87f,
-	32.70f,
-	34.65f,
-	36.71f,
-	38.89f,
-	41.20f,
-	43.65f,
-	46.25f,
-	49.00f,
-	51.91f
-};
-
-static f32 noteFreq(i32 index, i32 octave) {
-	return NOTE[index] * std::pow(2, octave);
-}
-
-static f32 noteFrequency(i32 index) {
-	return noteFreq(index % 12, (index / 12));
-}
-
 SynthVM::SynthVM() {
 	load(Program());
+	m_stack.clear();
 }
 
 void SynthVM::load(const Program& program) {
@@ -285,35 +240,45 @@ void SynthVM::load(const Program& program) {
 	m_program = program;
 	m_stack.clear();
 	m_lock.unlock();
+	m_storage.fill(0.0f);
 }
 
-Sample SynthVM::execute() {
-#define POP(x) if (!m_stack.empty()) { x = m_stack.back(); m_stack.pop_back(); }
+Sample SynthVM::execute(f32 sampleRate) {
+#define PUSH(x) if (m_stack.canPush()) { m_stack.push((x)); }
+#define POP(x) if (!m_stack.empty()) { x = m_stack.top(); m_stack.pop(); }
 	
-	u32 i = 0;
+	u32 i = 0, e = 0 /*Env*/;
 	for (auto&& ins : m_program) {
 		switch (ins.opcode) {
-			case OpPush: m_stack.push_back(ins.param); break;
-			case OpPushPtr: m_stack.push_back(*ins.paramPtr); break;
+			case OpPush: PUSH(ins.param); break;
+			case OpPushPtr: PUSH(*ins.paramPtr); break;
 			case OpOut: {
 				f32 val = 0.0f;
 				f32 level = 1.0f;
 				f32 pan = 0.5f;
 				POP(level);
 				POP(pan);
-				POP(val);
-				m_out = { val * level, val * level };
+
+				// mix all the inputs
+				f32 valmix = 0.0f;
+				while (!m_stack.empty()) {
+					POP(val);
+					valmix += val;
+				}
+				m_out = { valmix * level, valmix * level };
 			} break;
 			case OpSine: {
 				f32 freqMod = 0.0f;
 				f32 offset = 0.0f;
 				f32 lvl = 1.0f;
+				f32 lvlm = 1.0f;
 				POP(lvl);
+				POP(lvlm);
 				POP(offset);
 				POP(freqMod);
-				f32 freqVal = m_phases[i++].advance(m_frequency + offset, m_sampleRate) + freqMod;
+				f32 freqVal = m_phases[i++].advance(m_frequency + offset, sampleRate) + freqMod;
 				f32 s = ::sinf(freqVal);
-				m_stack.push_back(s * lvl);
+				PUSH(s * lvl * lvlm);
 			} break;
 			case OpLFO: {
 				f32 freq = 0.0f;
@@ -324,27 +289,80 @@ Sample SynthVM::execute() {
 				POP(vmax);
 				POP(vmin);
 				POP(freq);
-				f32 freqVal = m_phases[i++].advance(freq, m_sampleRate);
+				f32 freqVal = m_phases[i++].advance(freq, sampleRate);
 				f32 s = vmin + (::sinf(freqVal) * 0.5f + 0.5f) * (vmax - vmin);
-				m_stack.push_back(s * lvl);
+				PUSH(s * lvl);
+			} break;
+			case OpADSR: {
+				f32 lvl = 1.0f;
+				f32 a = 0.0f, d = 0.0f, s = 1.0f, r = 0.0f;
+				POP(lvl);
+				POP(r);
+				POP(s);
+				POP(d);
+				POP(a);
+				ADSR& env = m_envs[e++];
+				env.attack(a * sampleRate);
+				env.decay(d * sampleRate);
+				env.sustain(s * sampleRate);
+				env.release(r * sampleRate);
+				PUSH(env.sample() * lvl);
+			} break;
+			case OpMap: {
+				f32 lvl = 1.0f, in = 0.0f;
+				f32 fmi = 0.0f, fma = 1.0f, tmi = 0.0f, tma = 1.0f;
+				POP(lvl);
+				POP(in);
+				POP(tma);
+				POP(tmi);
+				POP(fma);
+				POP(fmi);
+				f32 norm = (in - fmi) / (fma - fmi);
+				PUSH((norm + tmi) * (tma - tmi));
+			} break;
+			case OpWrite: {
+				f32 lvl = 1.0f, chan = 0.0f, in = 0.0f;
+				POP(lvl);
+				POP(in);
+				POP(chan);
+				m_storage[u32(chan) % m_storage.size()] = in * lvl;
+				PUSH(m_storage[u32(chan) % m_storage.size()]);
+			} break;
+			case OpRead: {
+				f32 lvl = 1.0f, chan = 0.0f;
+				POP(lvl);
+				POP(chan);
+				PUSH(m_storage[u32(chan) % m_storage.size()] * lvl);
 			} break;
 		}
 	}
+	m_usedEnvs = e;
 	return m_out;
+}
+
+Voice::Voice() {
+	m_vm = std::make_unique<SynthVM>();
 }
 
 void Voice::setNote(u32 note) {
 	m_note = note;
-	m_vm.frequency(440.0f * std::powf(2.0f, (note - 69.0f) / 12.0f));
+	m_vm->frequency(440.0f * std::powf(2.0f, (note - 69.0f) / 12.0f));
 }
 
-Sample Voice::sample() {
+Sample Voice::sample(f32 sampleRate) {
 	if (!m_active) return { 0.0f, 0.0f };
-	auto s = m_vm.execute();
+	auto s = m_vm->execute(sampleRate);
 	return {
 		s.first * m_velocity,
 		s.second * m_velocity
 	};
+}
+
+Synth::Synth() {
+	sf_simplecomp(&m_compressor, int(m_sampleRate), 0.001f, -30.0f, 30.0f, 10.0f, 0.03f, 0.3f);
+	for (u32 i = 0; i < SynMaxVoices; i++) {
+		m_voices[i] = std::make_unique<Voice>();
+	}
 }
 
 void Synth::noteOn(u32 noteNumber, f32 velocity) {
@@ -353,13 +371,22 @@ void Synth::noteOn(u32 noteNumber, f32 velocity) {
 	voice->setNote(noteNumber);
 	voice->m_velocity = velocity;
 	voice->m_active = true;
+	for (auto&& env : voice->vm().envelopes()) {
+		env.active = true;
+		env.gate(true);
+	}
 }
 
 void Synth::noteOff(u32 noteNumber, f32 velocity) {
-	for (int i = 0; i < SynMaxVoices; i++) {
-		Voice& voice = m_voices[i];
+	for (u32 i = 0; i < SynMaxVoices; i++) {
+		Voice& voice = *m_voices[i].get();
 		if (voice.active() && voice.m_note == noteNumber) {
-			voice.free();
+			if (voice.vm().usedEnvelopes() == 0) voice.free();
+			else {
+				for (u32 e = 0; e < voice.vm().usedEnvelopes(); e++) {
+					voice.vm().envelopes()[e].gate(false);
+				}
+			}
 		}
 	}
 }
@@ -367,22 +394,39 @@ void Synth::noteOff(u32 noteNumber, f32 velocity) {
 Sample Synth::sample() {
 	Sample out{ 0.0f, 0.0f };
 	for (int i = 0; i < SynMaxVoices; i++) {
-		Voice& voice = m_voices[i];
-		auto s = voice.sample();
+		Voice& voice = *m_voices[i].get();
+		auto s = voice.sample(m_sampleRate);
+
+		bool done = true;
+		for (auto&& env : voice.vm().envelopes()) {
+			if (env.active) done = false; break;
+		}
+
+		if (done) voice.free();
+
 		out.first += s.first;
 		out.second += s.second;
 	}
-	return out;
+
+	// Compressor
+	sf_sample_st sin, sout;
+	sin.L = out.first;
+	sin.R = out.second;
+	sout.L = out.first;
+	sout.R = out.second;
+	sf_compressor_process(&m_compressor, 1, &sin, &sout);
+
+	return { sout.L, sout.R };
 }
 
 void Synth::setProgram(const Program& program) { 
 	m_program = program;
-	for (auto&& voice : m_voices) voice.vm().load(program);
+	for (auto&& voice : m_voices) voice->vm().load(program);
 }
 
 Voice* Synth::findFreeVoice() {
 	for (auto&& voice : m_voices) {
-		if (!voice.active()) return &voice;
+		if (!voice->active()) return voice.get();
 	}
 	return nullptr;
 }

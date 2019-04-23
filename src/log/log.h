@@ -1,6 +1,7 @@
 #ifndef TWEN_LOG_H
 #define TWEN_LOG_H
 
+#include <string.h>
 #include <sstream>
 #include <string>
 #include <utility>
@@ -61,7 +62,9 @@ private:
 #define SEP '/'
 #endif
 
-#define LogPrint(lvl, ...) Log::log(lvl, __FILE__, FN, __LINE__, _intern::Stringfy(__VA_ARGS__))
+#define __FILENAME__ (strrchr(__FILE__, '/') ? strrchr(__FILE__, '/') + 1 : __FILE__)
+
+#define LogPrint(lvl, ...) Log::log(lvl, __FILENAME__, FN, __LINE__, _intern::Stringfy(__VA_ARGS__))
 #define LogI(...) LogPrint(Log::Info, __VA_ARGS__)
 #define LogW(...) LogPrint(Log::Warning, __VA_ARGS__)
 #define LogE(...) LogPrint(Log::Error, __VA_ARGS__)

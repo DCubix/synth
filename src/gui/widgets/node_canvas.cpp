@@ -31,56 +31,6 @@ void NodeCanvas::onDraw(Renderer& renderer) {
 	m_gnodes[0].x = b.width - 12;
 	m_gnodes[0].y = b.height / 2 - NodeHeight / 2;
 
-	for (u32 nid : nodes) {
-		GNode gnode = m_gnodes[nid];
-		Node* node = m_system->get<Node>(nid);
-		i32 nx = gnode.x + b.x;
-		i32 ny = gnode.y + b.y;
-
-		if (node->type() != NodeType::Out) {
-			renderer.flatPanel(nx, ny, NodeWidth, NodeHeight, 0, 3, 0.8f);
-			renderer.pushClipping(nx + 1, ny + 1, NodeWidth - 2, NodeHeight - 2);
-			renderer.rect(nx + 1, ny + 1, NodeWidth - 2, 16, 0, 0, 0, 80, true);
-
-			std::string txt = "";
-			switch (node->type()) {
-				default: break;
-				case NodeType::SineWave: txt = "Sine"; break;
-				case NodeType::Value: txt = "Value"; break;
-				case NodeType::LFO: txt = "LFO"; break;
-			}
-			renderer.text(nx + 5, ny + 5, txt, 0, 0, 0, 128);
-			renderer.text(nx + 4, ny + 4, txt, 255, 255, 255, 180);
-
-			for (u32 i = 0; i < node->paramCount(); i++) {
-				i32 py = inY(i) + ny;
-				renderer.textSmall(nx + 4, py + 4, node->paramName(i), 0, 0, 0, 200);
-			}
-			renderer.popClipping();
-
-			for (u32 i = 0; i < node->paramCount(); i++) {
-				i32 py = inY(i) + ny;
-				i32 ly = py + 7;
-				renderer.line(nx, ly, nx - 8, ly, 255, 255, 255, 180);
-			}
-
-			i32 py = inY(0) + ny;
-			i32 ly = py + 7;
-			renderer.line(nx + NodeWidth, ly, nx + NodeWidth + 8, ly, 255, 255, 255, 180);
-
-			if (gnode.selected) {
-				renderer.rect(nx + 2, ny + 2, NodeWidth - 4, NodeHeight - 4, 255, 255, 255, 50, true);
-			}
-
-			//renderer.textSmall(nx + 4, py + 4, std::to_string(node->level()), 255, 0, 0, 255);
-		} else {
-			renderer.flatPanel(nx, ny, NodeWidth, NodeHeight, 0, 3, 0.8f);
-			i32 py = inY(0) + ny;
-			i32 ly = py + 7;
-			renderer.line(nx, ly, nx - 8, ly, 255, 255, 255, 180);
-		}
-	}
-
 	// Draw connections
 	for (u32 cid : m_system->connections()) {
 		auto conn = m_system->getConnection(cid);
@@ -94,7 +44,7 @@ void NodeCanvas::onDraw(Renderer& renderer) {
 
 		i32 srcX = src.x + NodeWidth + 11;
 		i32 destX = dest.x - 6;
-		
+
 		if (srcX > destX) {
 			i32 mid = (ldy - lsy) / 2;
 			renderer.curve(
@@ -115,7 +65,61 @@ void NodeCanvas::onDraw(Renderer& renderer) {
 			);
 		}
 	}
-	
+
+	for (u32 nid : nodes) {
+		GNode gnode = m_gnodes[nid];
+		Node* node = m_system->get<Node>(nid);
+		i32 nx = gnode.x + b.x;
+		i32 ny = gnode.y + b.y;
+
+		if (node->type() != NodeType::Out) {
+			renderer.flatPanel(nx, ny, NodeWidth, NodeHeight, 0, 3, 0.8f);
+			renderer.pushClipping(nx + 1, ny + 1, NodeWidth - 2, NodeHeight - 2);
+			renderer.rect(nx + 1, ny + 1, NodeWidth - 2, 16, 0, 0, 0, 80, true);
+
+			std::string txt = "";
+			switch (node->type()) {
+				default: break;
+				case NodeType::SineWave: txt = "Sine"; break;
+				case NodeType::Value: txt = "Value"; break;
+				case NodeType::LFO: txt = "LFO"; break;
+				case NodeType::ADSR: txt = "ADSR"; break;
+				case NodeType::Map: txt = "Map"; break;
+				case NodeType::Reader: txt = "Reader"; break;
+				case NodeType::Writer: txt = "Writer"; break;
+			}
+			renderer.text(nx + 5, ny + 5, txt, 0, 0, 0, 128);
+			renderer.text(nx + 4, ny + 4, txt, 255, 255, 255, 180);
+
+			for (u32 i = 0; i < node->paramCount(); i++) {
+				i32 py = inY(i) + ny;
+				renderer.textSmall(nx + 4, py + 4, node->paramName(i), 0, 0, 0, 200);
+			}
+			renderer.popClipping();
+
+			for (u32 i = 0; i < node->paramCount(); i++) {
+				i32 py = inY(i) + ny;
+				i32 ly = py + 7;
+				renderer.line(nx, ly, nx - 8, ly, 255, 255, 255, 180, 2);
+			}
+
+			i32 py = inY(0) + ny;
+			i32 ly = py + 7;
+			renderer.line(nx + NodeWidth, ly, nx + NodeWidth + 8, ly, 255, 255, 255, 180, 2);
+
+			if (gnode.selected) {
+				renderer.rect(nx + 2, ny + 2, NodeWidth - 4, NodeHeight - 4, 255, 255, 255, 50, true);
+			}
+
+			//renderer.textSmall(nx + 4, py + 4, std::to_string(node->level()), 255, 0, 0, 255);
+		} else {
+			renderer.flatPanel(nx, ny, NodeWidth, NodeHeight, 0, 2, 0.2f);
+			i32 py = inY(0) + ny;
+			i32 ly = py + 7;
+			renderer.line(nx, ly, nx - 8, ly, 255, 255, 255, 180, 6);
+		}
+	}
+
 	if (m_state == Linking) {
 		GNode gnode = m_gnodes[m_link.src];
 		i32 nx = gnode.x + b.x;
@@ -206,7 +210,10 @@ void NodeCanvas::onPress(u8 button, i32 x, i32 y) {
 						i32 ly = py + 7;
 						if (util::hits(x, y, nx - 8, ly - 3, 8, 6)) {
 							if (node->param(i).connected) {
-								m_system->disconnect(m_system->getConnection(nid, i));
+								auto cons = m_system->getConnections(nid, i);
+								for (u32 con : cons)
+									m_system->disconnect(con);
+								if (m_onConnect) m_onConnect();
 								invalidate();
 							}
 							break;

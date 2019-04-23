@@ -126,6 +126,9 @@ EventHandler::Status EventHandler::poll() {
 			} break;
 			case SDL_KEYDOWN: {
 				if (m_focused != nullptr) {
+					if (m_event.key.repeat == 0) {
+						m_focused->onKeyTap(m_event.key.keysym.sym, m_event.key.keysym.mod);
+					}
 					m_focused->onKeyPress(m_event.key.keysym.sym, m_event.key.keysym.mod);
 				}
 			} break;

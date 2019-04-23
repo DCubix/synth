@@ -7,6 +7,9 @@
 #include "engine/node_logic.h"
 #include "engine/sine_wave.hpp"
 #include "engine/lfo.hpp"
+#include "engine/adsr_node.hpp"
+#include "engine/remap.hpp"
+#include "engine/storage.hpp"
 
 #include "gui/gui.h"
 #include "gui/widgets/button.h"
@@ -15,6 +18,7 @@
 #include "gui/widgets/label.h"
 #include "gui/widgets/panel.h"
 #include "gui/widgets/node_canvas.h"
+#include "gui/widgets/keyboard.h"
 
 #include "../rtmidi/RtMidi.h"
 
@@ -83,26 +87,30 @@ int main(int argc, char** argv) {
 		"Synth",
 		SDL_WINDOWPOS_CENTERED,
 		SDL_WINDOWPOS_CENTERED,
-		640, 480,
+		800, 600,
 		SDL_WINDOW_SHOWN | SDL_WINDOW_RESIZABLE
 	);
 
 	ren = SDL_CreateRenderer(win, -1, SDL_RENDERER_ACCELERATED);
 
 	std::unique_ptr<Synth> vm = std::unique_ptr<Synth>(new Synth());
-	std::unique_ptr<RtMidiIn> midin = std::unique_ptr<RtMidiIn>(new RtMidiIn(
-		RtMidi::UNSPECIFIED, "Synth MIDI In"
-	));
-	midin->openPort(0, "SYMain In");
-	midin->setCallback(&midiCallback, vm.get());
-	midin->ignoreTypes();
-
+	try {
+		std::unique_ptr<RtMidiIn> midin = std::unique_ptr<RtMidiIn>(new RtMidiIn(
+			RtMidi::UNSPECIFIED, "Synth MIDI In"
+		));
+		midin->openPort(0, "SYMain In");
+		midin->setCallback(&midiCallback, vm.get());
+		midin->ignoreTypes();
+	} catch (RtMidiError& error) {
+		error.printMessage();
+	}
+	
 	GUI* gui = new GUI(ren);
 	Panel* root = gui->root();
 	root->gridHeight(20);
 	
 	NodeCanvas* cnv = gui->create<NodeCanvas>();
-	cnv->configure(0, 0, 11, 20);
+	cnv->configure(0, 0, 11, 17);
 	root->add(cnv);
 
 	Label* optTitle = gui->create<Label>();
@@ -114,7 +122,7 @@ int main(int argc, char** argv) {
 	Panel* options = gui->create<Panel>();
 	options->configure(1, 11, 5, 6);
 	options->gridWidth(4);
-	options->gridHeight(6);
+	options->gridHeight(8);
 	root->add(options);
 
 	Button* newSine = gui->create<Button>();
@@ -132,6 +140,50 @@ int main(int argc, char** argv) {
 		cnv->create<LFO>();
 	});
 	root->add(newLFO);
+
+	Button* newADSR = gui->create<Button>();
+	newADSR->configure(8, 11, 2);
+	newADSR->text("+ ADSR");
+	newADSR->onClick([&](u8 btn, i32 x, i32 y) {
+		cnv->create<ADSRNode>();
+	});
+	root->add(newADSR);
+
+	Button* newMap = gui->create<Button>();
+	newMap->configure(8, 13, 2);
+	newMap->text("+ Map");
+	newMap->onClick([&](u8 btn, i32 x, i32 y) {
+		cnv->create<Map>();
+	});
+	root->add(newMap);
+
+	Button* newReader = gui->create<Button>();
+	newReader->configure(9, 11, 2);
+	newReader->text("+ Reader");
+	newReader->onClick([&](u8 btn, i32 x, i32 y) {
+		cnv->create<Reader>();
+	});
+	root->add(newReader);
+
+	Button* newWriter = gui->create<Button>();
+	newWriter->configure(9, 13, 2);
+	newWriter->text("+ Writer");
+	newWriter->onClick([&](u8 btn, i32 x, i32 y) {
+		cnv->create<Writer>();
+	});
+	root->add(newWriter);
+
+	Keyboard* kb = gui->create<Keyboard>();
+	kb->configure(17, 0, root->gridWidth(), 3);
+	root->add(kb);
+
+	kb->onNoteOn([&](i32 note, f32 vel) {
+		vm->noteOn(note, vel);
+	});
+
+	kb->onNoteOff([&](i32 note, f32 vel) {
+		vm->noteOff(note, 0.0f);
+	});
 
 	cnv->onConnect([&]() {
 		vm->setProgram(cnv->system()->compile());
@@ -213,6 +265,81 @@ int main(int argc, char** argv) {
 					vmax->draggable(false);
 					options->add(vmax);
 				} break;
+				case NodeType::ADSR: {
+					optTitle->text("Node Options (ADSR)");
+
+					ADSRNode* an = (ADSRNode*)nd;
+					f32* values[4] = { &an->a, &an->d, &an->s, &an->r };
+					const std::string labels[] = { " A.", " D.", " S.", " R." };
+					for (u32 i = 0; i < 4; i++) {
+						Spinner* a = gui->create<Spinner>();
+						a->onChange([=](f32 value) {
+							ADSRNode* an = (ADSRNode*)cnv->current();
+							f32* values[4] = { &an->a, &an->d, &an->s, &an->r };
+							*(values[i]) = value;
+						});
+						a->configure(row++, 0, 4);
+						a->suffix(labels[i]);
+						a->minimum(0.0f);
+						a->maximum(10.0f);
+						a->value(*(values[i]));
+						options->add(a);
+					}
+				} break;
+				case NodeType::Map: {
+					optTitle->text("Node Options (Map)");
+
+					Map* an = (Map*)nd;
+					f32* values[4] = { &an->fromMin, &an->fromMax, &an->toMin, &an->toMax };
+					const std::string labels[] = { " F.Min.", " F.Max.", " T.Min.", " T.Max." };
+					for (u32 i = 0; i < 4; i++) {
+						Spinner* a = gui->create<Spinner>();
+						a->onChange([=](f32 value) {
+							Map* an = (Map*)cnv->current();
+							f32* values[4] = { &an->fromMin, &an->fromMax, &an->toMin, &an->toMax };
+							*(values[i]) = value;
+						});
+						a->configure(row++, 0, 4);
+						a->suffix(labels[i]);
+						a->minimum(-9999.0f);
+						a->maximum(9999.0f);
+						a->value(*(values[i]));
+						a->draggable(false);
+						options->add(a);
+					}
+				} break;
+				case NodeType::Reader: {
+					optTitle->text("Node Options (Reader)");
+
+					Reader* rnd = (Reader*)nd;
+					Spinner* a = gui->create<Spinner>();
+					a->onChange([=](f32 value) {
+						Reader* rnd = (Reader*)cnv->current();
+						rnd->channel = u32(value);
+					});
+					a->configure(row++, 0, 4);
+					a->suffix(" Ch.");
+					a->minimum(0);
+					a->maximum(32);
+					a->value(rnd->channel);
+					options->add(a);
+				} break;
+				case NodeType::Writer: {
+					optTitle->text("Node Options (Writer)");
+
+					Writer* rnd = (Writer*)nd;
+					Spinner* a = gui->create<Spinner>();
+					a->onChange([=](f32 value) {
+						Writer* rnd = (Writer*)cnv->current();
+						rnd->channel = u32(value);
+					});
+					a->configure(row++, 0, 4);
+					a->suffix(" Ch.");
+					a->minimum(0);
+					a->maximum(32);
+					a->value(rnd->channel);
+					options->add(a);
+				} break;
 				default: break;
 			}
 		}
@@ -221,7 +348,7 @@ int main(int argc, char** argv) {
 	SDL_AudioDeviceID device;
 	SDL_AudioSpec spec;
 	spec.freq = 44100;
-	spec.samples = 1024;
+	spec.samples = 512;
 	spec.channels = 2;
 	spec.callback = callback;
 	spec.userdata = vm.get();

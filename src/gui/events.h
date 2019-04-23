@@ -27,6 +27,7 @@ public:
 	virtual void onExit() { if (m_onExit) m_onExit(); }
 
 	virtual void onType(char chr) { if (m_onType) m_onType(chr); }
+	virtual void onKeyTap(u32 key, u32 mod) { if (m_onKeyTap) m_onKeyTap(key, mod); }
 	virtual void onKeyPress(u32 key, u32 mod) { if (m_onKeyPress) m_onKeyPress(key, mod); }
 	virtual void onKeyRelease(u32 key, u32 mod) { if (m_onKeyRelease) m_onKeyRelease(key, mod); }
 
@@ -58,7 +59,7 @@ protected:
 	std::function<void(i8)> m_onScroll;
 	std::function<void()> m_onEnter, m_onExit, m_onFocus, m_onBlur;
 	std::function<void(char)> m_onType;
-	std::function<void(u32, u32)> m_onKeyPress, m_onKeyRelease;
+	std::function<void(u32, u32)> m_onKeyPress, m_onKeyRelease, m_onKeyTap;
 
 	bool m_clicked{ false }, m_hovered{ false }, m_focused{ false }, m_enabled{ true };
 	Rect m_bounds{};

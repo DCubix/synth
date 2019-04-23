@@ -6,6 +6,7 @@
 #include <sstream>
 #include <string>
 #include <algorithm>
+#include <array>
 
 using u8  = uint8_t;
 using u16 = uint16_t;
@@ -51,6 +52,24 @@ namespace util {
 	inline bool hits(i32 x, i32 y, i32 w, i32 h, i32 bx, i32 by, i32 bw, i32 bh) {
 		return overlap(x, w, bx, bw) && overlap(y, h, by, bh);
 	}
+
+	template <typename T, size_t N>
+	class Stack {
+	public:
+		Stack() : m_top(-1) {}
+
+		inline bool empty() { return m_top <= -1; }
+		inline bool canPush() { return m_top < i32(N); }
+		inline void push(T value) { m_data[++m_top] = value; }
+		inline T top() { return m_data[m_top]; }
+		inline void pop() { m_data[m_top--]; }
+
+		inline void clear() { m_top = -1; m_data.fill(T(0)); }
+
+	private:
+		std::array<T, N> m_data;
+		i32 m_top{ -1 };
+	};
 }
 
 #endif // SY_COMMON_H
