@@ -22,6 +22,7 @@ public:
 	);
 	void rect(i32 x, i32 y, i32 w, i32 h, u8 r, u8 g, u8 b, u8 a = 0xFF, bool fill = false);
 	void triangle(i32 x1, i32 y1, i32 x2, i32 y2, i32 x3, i32 y3, u8 r, u8 g, u8 b, u8 a = 0xFF);
+	void arrow(i32 x, i32 y, i32 w, i32 h, f32 angle, u8 r, u8 g, u8 b, u8 a = 0xFF);
 
 	void panel(i32 x, i32 y, i32 w, i32 h, i32 sx = 0, i32 sy = 0, f32 shadow = 0.0f);
 	void button(i32 x, i32 y, i32 w, i32 h, u32 state = 0);

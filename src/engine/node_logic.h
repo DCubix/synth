@@ -35,13 +35,15 @@ enum OpCode {
 	OpADSR,
 	OpMap,
 	OpWrite,
-	OpRead
+	OpRead,
+	OpNodeID
 };
 
 struct Instruction {
 	OpCode opcode;
 	f32 param;
 	f32* paramPtr;
+	u32 nodeID;
 };
 using Program = std::vector<Instruction>;
 
@@ -51,15 +53,15 @@ public:
 		m_program.insert(m_program.begin(), initial.begin(), initial.end());
 		return *this;
 	}
-	inline ProgramBuilder& push(f32 value) { m_program.push_back({ OpPush, value }); return *this; }
-	inline ProgramBuilder& pushp(f32* value) { m_program.push_back({ OpPushPtr, 0, value }); return *this; }
-	inline ProgramBuilder& sine() { m_program.push_back({ OpSine, 0 }); return *this; }
-	inline ProgramBuilder& lfo() { m_program.push_back({ OpLFO, 0 }); return *this; }
-	inline ProgramBuilder& out() { m_program.push_back({ OpOut, 0 }); return *this; }
-	inline ProgramBuilder& adsr() { m_program.push_back({ OpADSR, 0 }); return *this; }
-	inline ProgramBuilder& map() { m_program.push_back({ OpMap, 0 }); return *this; }
-	inline ProgramBuilder& read() { m_program.push_back({ OpRead, 0 }); return *this; }
-	inline ProgramBuilder& write() { m_program.push_back({ OpWrite, 0 }); return *this; }
+	inline ProgramBuilder& push(u32 id, f32 value) { m_program.push_back({ OpPush, value, nullptr, id }); return *this; }
+	inline ProgramBuilder& pushp(u32 id, f32* value) { m_program.push_back({ OpPushPtr, 0, value, id }); return *this; }
+	inline ProgramBuilder& sine(u32 id) { m_program.push_back({ OpSine, 0, nullptr, id }); return *this; }
+	inline ProgramBuilder& lfo(u32 id) { m_program.push_back({ OpLFO, 0, nullptr, id }); return *this; }
+	inline ProgramBuilder& out(u32 id) { m_program.push_back({ OpOut, 0, nullptr, id }); return *this; }
+	inline ProgramBuilder& adsr(u32 id) { m_program.push_back({ OpADSR, 0, nullptr, id }); return *this; }
+	inline ProgramBuilder& map(u32 id) { m_program.push_back({ OpMap, 0, nullptr, id }); return *this; }
+	inline ProgramBuilder& read(u32 id) { m_program.push_back({ OpRead, 0, nullptr, id }); return *this; }
+	inline ProgramBuilder& write(u32 id) { m_program.push_back({ OpWrite, 0, nullptr, id }); return *this; }
 
 	Program build() const { return m_program; }
 
@@ -90,7 +92,7 @@ private:
 
 	std::array<Phase, 128> m_phases;
 	std::array<ADSR, 128> m_envs;
-	std::array<f32, 32> m_storage;
+	std::array<f32, SynMaxNodes> m_storage;
 	u32 m_usedEnvs{ 0 };
 
 	std::mutex m_lock;
@@ -242,6 +244,7 @@ public:
 	void disconnect(u32 connection);
 	u32 getConnection(u32 dest, u32 param);
 	std::vector<u32> getConnections(u32 dest, u32 param);
+	u32 getConnection(u32 src, u32 dest, u32 param);
 	std::vector<u32> getAllConnections(u32 node);
 
 	Program compile();

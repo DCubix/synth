@@ -38,28 +38,60 @@ void NodeCanvas::onDraw(Renderer& renderer) {
 		GNode dest = m_gnodes[conn->dest];
 
 		i32 sy = inY(0) + src.y + 2;
-		i32 lsy = sy + 7;
+		i32 lsy = sy + 10;
 		i32 dy = inY(conn->destParam) + dest.y + 2;
-		i32 ldy = dy + 7;
+		i32 ldy = dy + 10;
 
 		i32 srcX = src.x + NodeWidth + 11;
 		i32 destX = dest.x - 6;
 
-		if (srcX > destX) {
-			i32 mid = (ldy - lsy) / 2;
-			renderer.curve(
-				srcX, lsy,
-				srcX + 50, lsy + mid,
-				destX - 50, ldy - mid,
-				destX, ldy,
-				255, 255, 255, 180
-			);
+		if (conn->src != conn->dest) {
+			f32 arrowAngle = 0.0f;
+			if (srcX > destX) {
+				i32 mid = (ldy - lsy) / 2;
+				renderer.curve(
+					srcX, lsy,
+					srcX + 50, lsy + mid,
+					destX - 50, ldy - mid,
+					destX, ldy,
+					255, 255, 255, 180
+				);
+				f32 ox = util::deCasteljau(srcX, srcX+50, destX-50, destX, 0.9f);
+				f32 oy = util::deCasteljau(lsy, lsy+mid, ldy-mid, ldy, 0.9f);
+				f32 dx = ox - destX;
+				f32 dy = oy - ldy;
+				arrowAngle = std::atan2(dy, dx);
+			} else {
+				i32 mid = (destX - srcX) / 2;
+				renderer.curve(
+					srcX, lsy,
+					srcX + mid, lsy,
+					srcX + mid, ldy,
+					destX, ldy,
+					255, 255, 255, 180
+				);
+				f32 ox = util::deCasteljau(srcX, srcX+mid, srcX+mid, destX, 0.9f);
+				f32 oy = util::deCasteljau(lsy, lsy, ldy, ldy, 0.9f);
+				f32 dx = ox - destX;
+				f32 dy = oy - ldy;
+				arrowAngle = std::atan2(dy, dx);
+			}
+			renderer.arrow(destX, ldy, 14, 8, arrowAngle, 255, 255, 255, 200);
 		} else {
 			i32 mid = (destX - srcX) / 2;
+			renderer.rect(srcX-3, lsy-3, 6, 6, 255, 255, 255, 200, true);
+			renderer.arrow(destX, ldy, 14, 8, -PI/2, 255, 255, 255, 200);
 			renderer.curve(
 				srcX, lsy,
-				srcX + mid, lsy,
-				srcX + mid, ldy,
+				srcX, lsy - 20,
+				srcX, ldy - 40,
+				srcX + mid, ldy - 40,
+				255, 255, 255, 180
+			);
+			renderer.curve(
+				destX - mid, lsy - 40,
+				destX, lsy - 40,
+				destX, ldy - 20,
 				destX, ldy,
 				255, 255, 255, 180
 			);
@@ -208,7 +240,7 @@ void NodeCanvas::onPress(u8 button, i32 x, i32 y) {
 					for (u32 i = 0; i < node->paramCount(); i++) {
 						i32 py = inY(i) + ny;
 						i32 ly = py + 7;
-						if (util::hits(x, y, nx - 8, ly - 3, 8, 6)) {
+						if (util::hits(x, y, nx - 10, ly - 5, 10, 10)) {
 							if (node->param(i).connected) {
 								auto cons = m_system->getConnections(nid, i);
 								for (u32 con : cons)
@@ -246,11 +278,12 @@ void NodeCanvas::onRelease(u8 button, i32 x, i32 y) {
 		for (u32 i = 0; i < node->paramCount(); i++) {
 			i32 py = inY(i) + ny;
 			i32 ly = py + 7;
-			if (util::hits(x, y, nx - 8, ly - 4, 8, 8) && nid != m_link.src && m_link.active) {
-				m_system->connect(m_link.src, nid, i);
-				m_link.src = 0;
-				m_link.active = false;
-				if (m_onConnect) m_onConnect();
+			if (util::hits(x, y, nx - 10, ly - 5, 10, 10) /*&& nid != m_link.src*/ && m_link.active) {
+				if (m_system->connect(m_link.src, nid, i) != UINT32_MAX) {
+					m_link.src = 0;
+					m_link.active = false;
+					if (m_onConnect) m_onConnect();
+				}
 				break;
 			}
 		}

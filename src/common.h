@@ -53,6 +53,13 @@ namespace util {
 		return overlap(x, w, bx, bw) && overlap(y, h, by, bh);
 	}
 
+	inline f32 deCasteljau(f32 a, f32 b, f32 c, f32 d, f32 t) {
+		return std::pow(1.0f - t, 3)* a +
+			3.0f * std::pow(1.0f - t, 2) * t * b +
+			3.0f * (1.0f - t) * std::pow(t, 2) * c +
+			std::pow(t, 3) * d;
+	}
+
 	template <typename T, size_t N>
 	class Stack {
 	public:

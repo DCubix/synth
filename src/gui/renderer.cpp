@@ -76,20 +76,13 @@ void Renderer::line(i32 x1, i32 y1, i32 x2, i32 y2, u8 r, u8 g, u8 b, u8 a, u8 w
 	}
 }
 
-static f32 deCasteljau(f32 a, f32 b, f32 c, f32 d, f32 t) {
-	return std::pow(1.0f - t, 3)* a +
-		3.0f * std::pow(1.0f - t, 2) * t * b +
-		3.0f * (1.0f - t) * std::pow(t, 2) * c +
-		std::pow(t, 3) * d;
-}
-
 void Renderer::curve(
 	i32 x1, i32 y1, i32 x2, i32 y2, i32 x3, i32 y3, i32 x4, i32 y4,
 	u8 r, u8 g, u8 b, u8 a
 ) {
 	Sint16 vx[] = { x1, x2, x3, x4 };
 	Sint16 vy[] = { y1, y2, y3, y4 };
-	bezierRGBA(m_ren, vx, vy, 4, 5, r, g, b, a);
+	bezierRGBA(m_ren, vx, vy, 4, 100, r, g, b, a);
 }
 
 void Renderer::rect(i32 x, i32 y, i32 w, i32 h, u8 r, u8 g, u8 b, u8 a, bool fill) {
@@ -101,6 +94,27 @@ void Renderer::rect(i32 x, i32 y, i32 w, i32 h, u8 r, u8 g, u8 b, u8 a, bool fil
 
 void Renderer::triangle(i32 x1, i32 y1, i32 x2, i32 y2, i32 x3, i32 y3, u8 r, u8 g, u8 b, u8 a) {
 	filledTrigonRGBA(m_ren, x1, y1, x2, y2, x3, y3, r, g, b, a);
+}
+
+void Renderer::arrow(i32 x, i32 y, i32 w, i32 h, f32 angle, u8 r, u8 g, u8 b, u8 a) {
+	const f32 c = std::cos(angle), s = std::sin(angle);
+	f32 x1 = w, y1 = -h/2;
+	f32 x2 = 0, y2 = 0;
+	f32 x3 = w, y3 = h/2;
+
+	f32 _x1 = x1 * c - y1 * s,
+		_y1 = x1 * s + y1 * c;
+	f32 _x2 = x2 * c - y2 * s,
+		_y2 = x2 * s + y2 * c;
+	f32 _x3 = x3 * c - y3 * s,
+		_y3 = x3 * s + y3 * c;
+	
+	triangle(
+		x + i32(_x1), y + i32(_y1),
+		x + i32(_x2), y + i32(_y2),
+		x + i32(_x3), y + i32(_y3),
+		r, g, b, a
+	);
 }
 
 void Renderer::panel(i32 x, i32 y, i32 w, i32 h, i32 sx, i32 sy, f32 shadow) {

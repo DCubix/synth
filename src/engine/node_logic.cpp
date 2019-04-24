@@ -50,6 +50,11 @@ u32 NodeSystem::connect(u32 src, u32 dest, u32 param) {
 	auto posd = std::find(m_usedNodes.begin(), m_usedNodes.end(), dest);
 	if (posd == m_usedNodes.end()) return UINT32_MAX;
 
+	if (getConnection(src, dest, param) != UINT32_MAX) {
+		LogE("Already connected!");
+		return UINT32_MAX;
+	}
+
 	m_lock.lock();
 	// find a free spot
 	u32 spot = 0;
@@ -104,6 +109,16 @@ std::vector<u32> NodeSystem::getConnections(u32 dest, u32 param) {
 	return res;
 }
 
+u32 NodeSystem::getConnection(u32 src, u32 dest, u32 param) {
+	for (u32 cid : m_usedConnections) {
+		Connection* conn = m_connections[cid].get();
+		if (conn->src == src && conn->dest == dest && conn->destParam == param) {
+			return cid;
+		}
+	}
+	return UINT32_MAX;
+}
+
 std::vector<u32> NodeSystem::getAllConnections(u32 node) {
 	std::vector<u32> res;
 	for (u32 cid : m_usedConnections) {
@@ -117,63 +132,68 @@ std::vector<u32> NodeSystem::getAllConnections(u32 node) {
 
 static void process(NodeSystem* sys, Node* node, ProgramBuilder& out) {
 	auto type = node->type();
+	const u32 id = node->id();
 
 	switch (type) {
 		case NodeType::ADSR: {
 			ADSRNode* an = (ADSRNode*)node;
-			out.pushp(&an->a);
-			out.pushp(&an->d);
-			out.pushp(&an->s);
-			out.pushp(&an->r);
+			out.pushp(id, &an->a);
+			out.pushp(id, &an->d);
+			out.pushp(id, &an->s);
+			out.pushp(id, &an->r);
 		} break;
 		case NodeType::Map: {
 			Map* mn = (Map*)node;
-			out.pushp(&mn->fromMin);
-			out.pushp(&mn->fromMax);
-			out.pushp(&mn->toMin);
-			out.pushp(&mn->toMax);
+			out.pushp(id, &mn->fromMin);
+			out.pushp(id, &mn->fromMax);
+			out.pushp(id, &mn->toMin);
+			out.pushp(id, &mn->toMax);
 		} break;
 		case NodeType::Reader: {
 			Reader* mn = (Reader*)node;
-			out.pushp(&mn->channel);
+			out.pushp(id, &mn->channel);
 		} break;
 		case NodeType::Writer: {
 			Writer* mn = (Writer*)node;
-			out.pushp(&mn->channel);
+			out.pushp(id, &mn->channel);
 		} break;
 		default: break;
 	}
 
 	for (u32 i = 0; i < node->paramCount(); i++) {
 		if (!node->param(i).connected) {
-			out.pushp(&node->param(i).value);
+			out.pushp(id, &node->param(i).value);
 		} else {
 			auto&& conns = sys->getConnections(node->id(), i);
 			for (u32 cid : conns) {
 				auto conn = sys->getConnection(cid);
 				if (conn) {
-					Node* nd = sys->get<Node>(conn->src);
-					process(sys, nd, out);
+					if (conn->src == conn->dest) { // Handle loops
+						out.push(id, conn->dest); // Channel
+						out.push(id, 1.0f); // Lvl
+						out.read(id);
+					} else {
+						Node* nd = sys->get<Node>(conn->src);
+						process(sys, nd, out);
+					}
 				}
 			}
 		}
 	}
-	out.pushp(&node->level());
+	out.pushp(id, &node->level());
 	switch (type) {
-		case NodeType::LFO: out.lfo(); break;
-		case NodeType::SineWave: out.sine(); break;
-		case NodeType::Out: out.out(); break;
-		case NodeType::ADSR: out.adsr(); break;
-		case NodeType::Map: out.map(); break;
-		case NodeType::Reader: out.read(); break;
-		case NodeType::Writer: out.write(); break;
+		case NodeType::LFO: out.lfo(id); break;
+		case NodeType::SineWave: out.sine(id); break;
+		case NodeType::Out: out.out(id); break;
+		case NodeType::ADSR: out.adsr(id); break;
+		case NodeType::Map: out.map(id); break;
+		case NodeType::Reader: out.read(id); break;
+		case NodeType::Writer: out.write(id); break;
 		default: break;
 	}
 }
 
 Program NodeSystem::compile() {
-	std::vector<u32> nodes = buildNodes(0);
-
 	ProgramBuilder builder;
 	process(this, m_nodes[0].get(), builder);
 	return builder.build();
@@ -248,7 +268,9 @@ Sample SynthVM::execute(f32 sampleRate) {
 #define POP(x) if (!m_stack.empty()) { x = m_stack.top(); m_stack.pop(); }
 	
 	u32 i = 0, e = 0 /*Env*/;
+	f32 result = 0.0f;
 	for (auto&& ins : m_program) {
+		result = m_storage[ins.nodeID];
 		switch (ins.opcode) {
 			case OpPush: PUSH(ins.param); break;
 			case OpPushPtr: PUSH(*ins.paramPtr); break;
@@ -265,7 +287,8 @@ Sample SynthVM::execute(f32 sampleRate) {
 					POP(val);
 					valmix += val;
 				}
-				m_out = { valmix * level, valmix * level };
+				result = valmix * level;
+				m_out = { result * (1.0f - pan), result * pan };
 			} break;
 			case OpSine: {
 				f32 freqMod = 0.0f;
@@ -278,7 +301,8 @@ Sample SynthVM::execute(f32 sampleRate) {
 				POP(freqMod);
 				f32 freqVal = m_phases[i++].advance(m_frequency + offset, sampleRate) + freqMod;
 				f32 s = ::sinf(freqVal);
-				PUSH(s * lvl * lvlm);
+				result = s * lvl * lvlm;
+				PUSH(result);
 			} break;
 			case OpLFO: {
 				f32 freq = 0.0f;
@@ -291,7 +315,8 @@ Sample SynthVM::execute(f32 sampleRate) {
 				POP(freq);
 				f32 freqVal = m_phases[i++].advance(freq, sampleRate);
 				f32 s = vmin + (::sinf(freqVal) * 0.5f + 0.5f) * (vmax - vmin);
-				PUSH(s * lvl);
+				result = s * lvl;
+				PUSH(result);
 			} break;
 			case OpADSR: {
 				f32 lvl = 1.0f;
@@ -306,7 +331,8 @@ Sample SynthVM::execute(f32 sampleRate) {
 				env.decay(d * sampleRate);
 				env.sustain(s * sampleRate);
 				env.release(r * sampleRate);
-				PUSH(env.sample() * lvl);
+				result = env.sample() * lvl;
+				PUSH(result);
 			} break;
 			case OpMap: {
 				f32 lvl = 1.0f, in = 0.0f;
@@ -318,7 +344,8 @@ Sample SynthVM::execute(f32 sampleRate) {
 				POP(fma);
 				POP(fmi);
 				f32 norm = (in - fmi) / (fma - fmi);
-				PUSH((norm + tmi) * (tma - tmi));
+				result = (norm + tmi) * (tma - tmi);
+				PUSH(result);
 			} break;
 			case OpWrite: {
 				f32 lvl = 1.0f, chan = 0.0f, in = 0.0f;
@@ -326,15 +353,19 @@ Sample SynthVM::execute(f32 sampleRate) {
 				POP(in);
 				POP(chan);
 				m_storage[u32(chan) % m_storage.size()] = in * lvl;
-				PUSH(m_storage[u32(chan) % m_storage.size()]);
+				result = m_storage[u32(chan) % m_storage.size()];
+				PUSH(result);
 			} break;
 			case OpRead: {
 				f32 lvl = 1.0f, chan = 0.0f;
 				POP(lvl);
 				POP(chan);
-				PUSH(m_storage[u32(chan) % m_storage.size()] * lvl);
+				result = m_storage[u32(chan) % m_storage.size()] * lvl;
+				PUSH(result);
 			} break;
 		}
+		// Write result to storage
+		m_storage[ins.nodeID] = result;
 	}
 	m_usedEnvs = e;
 	return m_out;

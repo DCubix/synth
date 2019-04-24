@@ -49,7 +49,7 @@ void Spinner::onDraw(Renderer& renderer) {
 }
 
 void Spinner::onMove(i32 x, i32 y) {
-	auto b = bounds();
+	auto b = realBounds();
 	i32 halfH = b.height / 2;
 	i32 mainW = b.width - buttonW;
 	if (hitsR(x, y, mainW, 0, buttonW, halfH)) { // INC
@@ -83,7 +83,7 @@ void Spinner::onMove(i32 x, i32 y) {
 void Spinner::onClick(u8 button, i32 x, i32 y) {
 	Widget::onClick(button, x, y);
 
-	auto b = bounds();
+	auto b = realBounds();
 	i32 mainW = b.width - buttonW;
 	if (hitsR(x, y, 0, 0, mainW, b.height) && m_draggable) {
 		f32 xnorm = f32(x) / (mainW - 2);
@@ -98,7 +98,7 @@ void Spinner::onClick(u8 button, i32 x, i32 y) {
 void Spinner::onDoubleClick(u8 button, i32 x, i32 y) {
 	Widget::onDoubleClick(button, x, y);
 
-	auto b = bounds();
+	auto b = realBounds();
 	i32 mainW = b.width - buttonW;
 	if (hitsR(x, y, 0, 0, mainW, b.height)) {
 		m_editing = true;
@@ -110,7 +110,7 @@ void Spinner::onDoubleClick(u8 button, i32 x, i32 y) {
 void Spinner::onPress(u8 button, i32 x, i32 y) {
 	Widget::onPress(button, x, y);
 	if (!m_editing) {
-		auto b = bounds();
+		auto b = realBounds();
 		i32 halfH = b.height / 2;
 		i32 mainW = b.width - buttonW;
 		if (hitsR(x, y, mainW, 0, buttonW, halfH)) { // INC

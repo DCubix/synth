@@ -149,7 +149,7 @@ int main(int argc, char** argv) {
 
 	Panel* buttonsPanel = gui->create<Panel>();
 	buttonsPanel->layoutParam(BorderLayoutPosition::Bottom);
-	buttonsPanel->bounds().height = 256;
+	buttonsPanel->bounds().height = 128;
 	buttonsPanel->gridWidth(6);
 	buttonsPanel->gridHeight(4);
 	sidePanel->add(buttonsPanel);
@@ -203,6 +203,7 @@ int main(int argc, char** argv) {
 	buttonsPanel->add(newWriter);
 
 	Keyboard* kb = gui->create<Keyboard>();
+	kb->bounds().height = 72;
 	kb->layoutParam(BorderLayoutPosition::Bottom);
 	root->add(kb);
 

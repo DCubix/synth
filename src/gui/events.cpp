@@ -45,6 +45,7 @@ EventHandler::Status EventHandler::poll() {
 
 				bool cont = false;
 				for (Element* el : m_elements) {
+					auto b = el->realBounds();
 					if (!el->hits(x, y)) continue;
 					cont = true;
 
@@ -64,10 +65,10 @@ EventHandler::Status EventHandler::poll() {
 
 						el->m_clicked = true;
 						if (m_event.button.clicks > 1) {
-							el->onDoubleClick(m_event.button.button, x - el->bounds().x, y - el->bounds().y);
-							el->onPress(m_event.button.button, x - el->bounds().x, y - el->bounds().y);
+							el->onDoubleClick(m_event.button.button, x - b.x, y - b.y);
+							el->onPress(m_event.button.button, x - b.x, y - b.y);
 						} else {
-							el->onPress(m_event.button.button, x - el->bounds().x, y - el->bounds().y);
+							el->onPress(m_event.button.button, x - b.x, y - b.y);
 						}
 						if (m_elementsChanged) {
 							m_elementsChanged = false;
@@ -83,14 +84,15 @@ EventHandler::Status EventHandler::poll() {
 
 				bool cont = false;
 				for (Element* el : m_elements) {
+					auto b = el->realBounds();
 					if (!el->hits(x, y)) continue;
 					cont = true;
 
 					if (el->enabled()) {
 						if (el->m_clicked) {
-							el->onClick(m_event.button.button, x - el->bounds().x, y - el->bounds().y);
+							el->onClick(m_event.button.button, x - b.x, y - b.y);
 						}
-						el->onRelease(m_event.button.button, x - el->bounds().x, y - el->bounds().y);
+						el->onRelease(m_event.button.button, x - b.x, y - b.y);
 						if (m_elementsChanged) {
 							m_elementsChanged = false;
 							break;
@@ -116,10 +118,11 @@ EventHandler::Status EventHandler::poll() {
 					}
 
 					if (el->enabled()) {
+						auto b = el->realBounds();
 						if (!el->m_hovered) {
 							el->onEnter();
 						}
-						el->onMove(x - el->bounds().x, y - el->bounds().y);
+						el->onMove(x - b.x, y - b.y);
 						el->m_hovered = true;
 						if (m_elementsChanged) {
 							m_elementsChanged = false;
