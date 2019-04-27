@@ -13,17 +13,23 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 
 file(GLOB_RECURSE SRC "src/*.h" "src/*.hpp" "src/*.cpp" "src/*.c")
 
-find_package(SDL2 CONFIG REQUIRED)
+if (MINGW)
+	find_package(SDL2 REQUIRED SDL2)
+else()
+	find_package(SDL2 CONFIG REQUIRED)
+endif()
 find_package(SDL2_gfx REQUIRED STATIC)
 
 set(BUILD_SHARED_LIBS CACHE BOOL OFF)
 set(BUILD_TESTING CACHE BOOL OFF)
 add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/rtmidi)
 add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/sndfilter)
+add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/osdialog)
 
 add_executable(${PROJECT_NAME} ${SRC})
 target_link_libraries(${PROJECT_NAME}
 	PRIVATE
 	SDL2::SDL2 SDL2::SDL2main
-	${SDL2_GFX_LIBRARIES} rtmidi sndfilter
+	${SDL2_GFX_LIBRARIES}
+	rtmidi sndfilter osdialog
 )

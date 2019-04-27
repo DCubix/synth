@@ -27,6 +27,9 @@ public:
 	u32 spacing() const { return m_spacing; }
 	void spacing(u32 v) { m_spacing = v; }
 
+	bool drawBackground() const { return m_drawBackground; }
+	void drawBackground(bool v) { m_drawBackground = v; }
+
 	void setLayout(Layout* layout);
 
 	void removeAll();
@@ -39,6 +42,8 @@ private:
 		m_gridHeight{ 2 }, // # of rows
 		m_padding{ 5 }, // Spacing around the edges
 		m_spacing{ 4 }; // Spacing between grid cells
+
+	bool m_drawBackground{ true };
 
 	void performLayout();
 };

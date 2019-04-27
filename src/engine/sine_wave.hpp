@@ -14,7 +14,7 @@ public:
 	}
 
 	inline NodeType type() { return NodeType::SineWave; }
-
+	
 private:
 	Phase m_phase{ PI * 2.0f };
 };

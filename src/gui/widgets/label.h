@@ -17,9 +17,13 @@ public:
 	Alignment textAlign() const { return m_textAlign; }
 	void textAlign(Alignment v) { m_textAlign = v; invalidate(); }
 
+	bool autoWidth() const { return m_autoWidth; }
+	void autoWidth(bool v) { m_autoWidth = v; invalidate(); }
+
 private:
 	std::string m_text{ "Label" };
 	Alignment m_textAlign{ Left };
+	bool m_autoWidth{ false };
 };
 
 #endif // SYG_LABEL_H

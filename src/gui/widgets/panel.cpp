@@ -11,7 +11,7 @@ void Panel::onDraw(Renderer& renderer) {
 	performLayout();
 
 	auto b = realBounds();
-	renderer.panel(b.x, b.y, b.width, b.height);
+	if (m_drawBackground) renderer.panel(b.x, b.y, b.width, b.height);
 	renderer.pushClipping(
 		b.x + m_padding, b.y + m_padding, 
 		b.width - m_padding * 2, b.height - m_padding * 2

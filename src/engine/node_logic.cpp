@@ -23,7 +23,6 @@ std::string Node::paramName(u32 id) {
 }
 
 NodeSystem::NodeSystem() {
-	m_nodeBuffer.fill(0.0f);
 	create<Output>();
 }
 
@@ -36,8 +35,18 @@ void NodeSystem::destroy(u32 id) {
 	m_lock.lock();
 	m_usedNodes.erase(pos);
 	m_nodes[id].reset();
-	m_nodeBuffer[id] = 0.0f;
 	m_lock.unlock();
+}
+
+void NodeSystem::clear() {
+	m_lock.lock();
+	m_usedNodes.clear();
+	m_usedConnections.clear();
+
+	for (auto&& ptr : m_nodes) if (ptr) ptr.reset();
+	for (auto&& ptr : m_connections) if (ptr) ptr.reset();
+	m_lock.unlock();
+	create<Output>();
 }
 
 u32 NodeSystem::connect(u32 src, u32 dest, u32 param) {
@@ -215,55 +224,20 @@ Program NodeSystem::compile() {
 	return builder.build();
 }
 
-std::vector<u32> NodeSystem::getInputs(u32 node) {
-	std::vector<u32> ins;
-	for (u32 cid : m_usedConnections) {
-		Connection* conn = m_connections[cid].get();
-		if (conn == nullptr) continue;
-		if (conn->dest == node) {
-			if (std::find(ins.begin(), ins.end(), conn->src) == ins.end())
-				ins.push_back(conn->src);
-		}
-	}
-	return ins;
-}
-
-std::vector<u32> NodeSystem::buildNodes(const std::vector<u32>& nodes) {
-	if (nodes.empty()) return std::vector<u32>();
-
-	std::vector<u32> nodesg;
-
-	nodesg.insert(nodesg.end(), nodes.begin(), nodes.end());
-
-	for (u32 node : nodes) {
-		for (u32 in : getInputs(node)) {
-			if (!get<Node>(in)) continue;
-
-			nodesg.push_back(in);
-
-			for (u64 rnd : buildNodes(in)) {
-				if (!get<Node>(rnd)) continue;
-
-				if (std::find(nodesg.begin(), nodesg.end(), rnd) == nodesg.end()) {
-					nodesg.push_back(rnd);
-				}
-			}
-		}
-	}
-
-	return nodesg;
-}
-
-std::vector<u32> NodeSystem::buildNodes(u32 node) {
-	std::vector<u32> ret;
-	ret.push_back(node);
-	return buildNodes(ret);
-}
-
 Output::Output() {
 	addParam("Out");
 	addParam("Pan");
 	param(1).value = 0.5f;
+}
+
+void Output::load(Json json) {
+	Node::load(json);
+	pan(json.value("pan", 0.5f));
+}
+
+void Output::save(Json& json) {
+	Node::save(json);
+	json["pan"] = pan();
 }
 
 SynthVM::SynthVM() {

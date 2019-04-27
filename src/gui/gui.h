@@ -9,6 +9,7 @@
 
 #include "widgets/panel.h"
 
+class Spinner;
 class GUI {
 public:
 	GUI(SDL_Renderer* ren);
@@ -21,6 +22,13 @@ public:
 		m_events->subscribe(m_widgets.back().get());
 		return dynamic_cast<T*>(m_widgets.back().get());
 	}
+
+	Spinner* spinner(
+		f32* value, f32 vmin, f32 vmax,
+		const std::string& suffix = "", 
+		bool drag = true,
+		const std::function<void()> onChange = nullptr
+	);
 
 	void destroy(Widget* widget);
 

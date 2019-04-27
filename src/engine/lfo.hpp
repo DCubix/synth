@@ -17,6 +17,20 @@ public:
 
 	inline NodeType type() { return NodeType::LFO; }
 
+	inline virtual void load(Json json) override {
+		Node::load(json);
+		min = json.value("min", 0.0f);
+		max = json.value("max", 1.0f);
+		param(0).value = json.value("freq", 2.0f);
+	}
+
+	inline virtual void save(Json& json) override {
+		Node::save(json);
+		json["min"] = min;
+		json["max"] = max;
+		json["freq"] = param(0).value;
+	}
+
 	f32 min{ 0.0f }, max{ 1.0f };
 
 private:

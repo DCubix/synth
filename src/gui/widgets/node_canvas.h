@@ -42,10 +42,14 @@ public:
 	std::vector<u32> selected() { return m_selected; }
 
 	void onSelect(const std::function<void(Node*)>& cb) { m_onSelect = cb; }
+	void onChange(const std::function<void()>& cb) { m_onChange = cb; }
 	void onConnect(const std::function<void()>& cb) { m_onConnect = cb; }
 	void deselect();
 
 	Node* current() { return m_selected.empty() ? nullptr : m_system->get<Node>(m_selected[0]); }
+
+	void load(Json json);
+	void save(Json& json);
 
 private:
 	enum State {
@@ -56,7 +60,7 @@ private:
 	};
 
 	std::function<void(Node*)> m_onSelect;
-	std::function<void()> m_onConnect;
+	std::function<void()> m_onConnect, m_onChange;
 
 	std::array<GNode, SynMaxNodes> m_gnodes;
 	std::unique_ptr<NodeSystem> m_system;

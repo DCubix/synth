@@ -1,4 +1,6 @@
 #include <iostream>
+#include <fstream>
+#include <sstream>
 
 #include "common.h"
 #include "sdl2.h"
@@ -21,6 +23,7 @@
 #include "gui/widgets/keyboard.h"
 
 #include "../rtmidi/RtMidi.h"
+#include "../osdialog/OsDialog.hpp"
 
 enum MidiCommand {
 	NoteOff = 0x8,
@@ -93,6 +96,8 @@ int main(int argc, char** argv) {
 
 	ren = SDL_CreateRenderer(win, -1, SDL_RENDERER_ACCELERATED);
 
+	bool saved = true;
+	std::string savedFile = "";
 	std::unique_ptr<Synth> vm = std::unique_ptr<Synth>(new Synth());
 	try {
 		std::unique_ptr<RtMidiIn> midin = std::unique_ptr<RtMidiIn>(new RtMidiIn(
@@ -115,7 +120,17 @@ int main(int argc, char** argv) {
 	cnv->layoutParam(BorderLayoutPosition::Center);
 	root->add(cnv);
 
+	Panel* topPanel = gui->create<Panel>();
+	topPanel->drawBackground(false);
+	topPanel->padding(1);
+	topPanel->setLayout(new FlowLayout());
+	topPanel->layoutParam(BorderLayoutPosition::Top);
+	topPanel->bounds().height = 22;
+	root->add(topPanel);
+
 	Panel* sidePanel = gui->create<Panel>();
+	sidePanel->drawBackground(false);
+	sidePanel->padding(0);
 	sidePanel->setLayout(new BorderLayout());
 	sidePanel->layoutParam(BorderLayoutPosition::Right);
 	sidePanel->bounds().width = 200;
@@ -186,6 +201,113 @@ int main(int argc, char** argv) {
 	});
 	buttonsPanel->add(newMap);
 
+	Label* lblFile = gui->create<Label>();
+	lblFile->text("*");
+	lblFile->autoWidth(true);
+
+	auto newFileFunc = [&]() {
+		cnv->system()->clear();
+		vm->setProgram(cnv->system()->compile());
+		cnv->invalidate();
+		savedFile = "";
+		saved = true;
+		lblFile->text("*");
+	};
+
+	Button* btNew = gui->create<Button>();
+	btNew->bounds().width = 42;
+	btNew->text("New");
+	btNew->onClick([&](u8 btn, i32 x, i32 y) {
+		if (!saved) {
+			auto res = osd::Dialog::message(
+				osd::MessageLevel::Warning,
+				osd::MessageButtons::YesNo,
+				"Unsaved Program",
+				"You program has not been saved, and your changes will be lost. Do you wish to continue?"
+			);
+			if (res == osd::Dialog::Yes) {
+				newFileFunc();
+			}
+		} else {
+			newFileFunc();
+		}
+	});
+	topPanel->add(btNew);
+
+	auto openFileFunc = [&]() {
+		auto res = osd::Dialog::file(
+			osd::DialogAction::OpenFile,
+			".",
+			osd::Filters("Synth Program:sprog")
+		);
+		if (res.has_value()) {
+			Json json = util::pack::loadFile(res.value());
+			cnv->load(json);
+			vm->setProgram(cnv->system()->compile());
+			cnv->invalidate();
+			savedFile = res.value();
+			saved = true;
+			lblFile->text(savedFile);
+		}
+	};
+
+	Button* btOpen = gui->create<Button>();
+	btOpen->bounds().width = 42;
+	btOpen->text("Open");
+	btOpen->onClick([&](u8 btn, i32 x, i32 y) {
+		if (!saved) {
+			auto res = osd::Dialog::message(
+				osd::MessageLevel::Warning,
+				osd::MessageButtons::YesNo,
+				"Unsaved Program",
+				"You program has not been saved, and your changes will be lost. Do you wish to continue?"
+			);
+			if (res == osd::Dialog::Yes) {
+				openFileFunc();
+			}
+		} else {
+			openFileFunc();
+		}
+	});
+	topPanel->add(btOpen);
+
+	Button* btSave = gui->create<Button>();
+	btSave->bounds().width = 42;
+	btSave->text("Save");
+	btSave->onClick([&](u8 btn, i32 x, i32 y) {
+		if (savedFile.empty()) {
+			auto res = osd::Dialog::file(
+				osd::DialogAction::SaveFile,
+				".",
+				osd::Filters("Synth Program:sprog")
+			);
+			if (res.has_value()) {
+				Json json; cnv->save(json);
+				util::pack::saveFile(res.value(), json);
+				saved = true;
+				savedFile = res.value();
+				lblFile->text(savedFile);
+			}
+		} else {
+			Json json; cnv->save(json);
+			util::pack::saveFile(savedFile, json);
+			saved = true;
+			lblFile->text(savedFile);
+		}
+	});
+	topPanel->add(btSave);
+
+	Button* btSaveAs = gui->create<Button>();
+	btSaveAs->bounds().width = 64;
+	btSaveAs->text("Save As");
+	btSaveAs->onClick([&](u8 btn, i32 x, i32 y) {
+		savedFile = "";
+		btSave->onClick(btn, 2, 2);
+	});
+	topPanel->add(btSaveAs);
+
+	topPanel->add(lblFile);
+
 	Keyboard* kb = gui->create<Keyboard>();
 	kb->bounds().height = 64;
 	kb->layoutParam(BorderLayoutPosition::Bottom);
@@ -201,6 +323,10 @@ int main(int argc, char** argv) {
 
 	cnv->onConnect([&]() {
 		vm->setProgram(cnv->system()->compile());
+	});
+
+	cnv->onChange([&]() {
+		saved = false;
 	});
 
 	cnv->onSelect([&](Node* nd) {
@@ -219,9 +345,9 @@ int main(int argc, char** argv) {
 						cnv->system()->destroy(nd->id());
 						cnv->deselect();
 						vm->setProgram(cnv->system()->compile());
-					} else {
-						vm->noteOn(36);
-						vm->noteOn(40);
+						saved = false;
+						cnv->invalidate();
+						lblFile->text(savedFile + "*");
 					}
 				});
 				btnDel->configure(0, 3, 3, 2);
@@ -231,11 +357,14 @@ int main(int argc, char** argv) {
 
 			u32 row = 0;
 
+			auto onChange = [&]() { saved = false; lblFile->text(savedFile + "*"); };
+
 			Spinner* level = gui->create<Spinner>();
 			level->configure(row++, 0, 4);
 			level->value(nd->level());
 			level->onChange([&](f32 value) {
 				cnv->current()->level(value);
+				saved = false;
 			});
 			level->suffix(" Lvl.");
 			level->step(0.01f);
@@ -246,41 +375,26 @@ int main(int argc, char** argv) {
 				case NodeType::SineWave: optTitle->text("Node Options (Sine)"); break;
 				case NodeType::LFO: {
 					optTitle->text("Node Options (LFO)");
-					Spinner* freq = gui->create<Spinner>();
-					freq->onChange([&](f32 value) {
-						cnv->current()->param(0).value = value;
-					});
+
+					Spinner* freq = gui->spinner(
+						&cnv->current()->param(0).value, 0.01f, 100.0f,
+						" Freq.", true,	onChange
+					);
 					freq->configure(row++, 0, 4);
-					freq->suffix(" Freq.");
-					freq->minimum(0.01f);
-					freq->maximum(20.0f);
-					freq->value(nd->param(0).value);
 					options->add(freq);
 
-					Spinner* vmin = gui->create<Spinner>();
-					vmin->onChange([&](f32 value) {
-						LFO* lfo = (LFO*)cnv->current();
-						lfo->min = value;
-					});
+					Spinner* vmin = gui->spinner(
+						&((LFO*)cnv->current())->min, -9999, 9999,
+						" Min.", false, onChange
+					);
 					vmin->configure(row++, 0, 4);
-					vmin->suffix(" Min.");
-					vmin->minimum(-9999.0f);
-					vmin->maximum(9999.0f);
-					vmin->value(((LFO*)nd)->min);
-					vmin->draggable(false);
 					options->add(vmin);
 
-					Spinner* vmax = gui->create<Spinner>();
-					vmax->onChange([&](f32 value) {
-						LFO* lfo = (LFO*)cnv->current();
-						lfo->max = value;
-					});
+					Spinner* vmax = gui->spinner(
+						&((LFO*)cnv->current())->max, -9999, 9999,
+						" Min.", false, onChange
+					);
 					vmax->configure(row++, 0, 4);
-					vmax->suffix(" Max.");
-					vmax->minimum(-9999.0f);
-					vmax->maximum(9999.0f);
-					vmax->value(((LFO*)nd)->max);
-					vmax->draggable(false);
 					options->add(vmax);
 				} break;
 				case NodeType::ADSR: {
@@ -289,18 +403,13 @@ int main(int argc, char** argv) {
 					ADSRNode* an = (ADSRNode*)nd;
 					f32* values[4] = { &an->a, &an->d, &an->s, &an->r };
 					const std::string labels[] = { " A.", " D.", " S.", " R." };
+
 					for (u32 i = 0; i < 4; i++) {
-						Spinner* a = gui->create<Spinner>();
-						a->onChange([=](f32 value) {
-							ADSRNode* an = (ADSRNode*)cnv->current();
-							f32* values[4] = { &an->a, &an->d, &an->s, &an->r };
-							*(values[i]) = value;
-						});
+						Spinner* a = gui->spinner(
+							values[i], 0, i == 2 ? 1 : 10,
+							labels[i], true, onChange
+						);
 						a->configure(row++, 0, 4);
-						a->suffix(labels[i]);
-						a->minimum(0.0f);
-						a->maximum(10.0f);
-						a->value(*(values[i]));
 						options->add(a);
 					}
 				} break;
@@ -311,18 +420,11 @@ int main(int argc, char** argv) {
 					f32* values[4] = { &an->fromMin, &an->fromMax, &an->toMin, &an->toMax };
 					const std::string labels[] = { " F.Min.", " F.Max.", " T.Min.", " T.Max." };
 					for (u32 i = 0; i < 4; i++) {
-						Spinner* a = gui->create<Spinner>();
-						a->onChange([=](f32 value) {
-							Map* an = (Map*)cnv->current();
-							f32* values[4] = { &an->fromMin, &an->fromMax, &an->toMin, &an->toMax };
-							*(values[i]) = value;
-						});
+						Spinner* a = gui->spinner(
+							values[i], -9999, 9999,
+							labels[i], false, onChange
+						);
 						a->configure(row++, 0, 4);
-						a->suffix(labels[i]);
-						a->minimum(-9999.0f);
-						a->maximum(9999.0f);
-						a->value(*(values[i]));
-						a->draggable(false);
 						options->add(a);
 					}
 				} break;
@@ -362,7 +464,21 @@ int main(int argc, char** argv) {
 		accum += delta;
 
 		switch (gui->events()->poll()) {
-			case EventHandler::Status::Quit: running = false; break;
+			case EventHandler::Status::Quit: {
+				if (!saved) {
+					auto res = osd::Dialog::message(
+						osd::MessageLevel::Warning,
+						osd::MessageButtons::YesNo,
+						"Unsaved Program",
+						"You program has not been saved, and your changes will be lost. Do you wish to continue?"
+					);
+					if (res == osd::Dialog::Yes) {
+						running = false;
+					}
+				} else {
+					running = false;
+				}
+			} break;
 			case EventHandler::Status::Resize: gui->clear(); gui->root()->invalidate(); break;
 			default: break;
 		}

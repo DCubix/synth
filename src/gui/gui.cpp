@@ -2,6 +2,8 @@
 
 #include <algorithm>
 
+#include "widgets/spinner.h"
+
 GUI::GUI(SDL_Renderer* ren) {
 	m_events = std::make_unique<EventHandler>();
 	m_renderer = std::make_unique<Renderer>(ren);
@@ -11,6 +13,27 @@ GUI::GUI(SDL_Renderer* ren) {
 	m_root->gridHeight(16);
 	m_root->spacing(4);
 	m_root->padding(2);
+}
+
+Spinner* GUI::spinner(
+	f32* value, f32 vmin, f32 vmax,
+	const std::string& suffix,
+	bool drag,
+	const std::function<void()> onChange
+) {
+	Spinner* spn = create<Spinner>();
+	spn->m_userData = value;
+	spn->minimum(vmin);
+	spn->maximum(vmax);
+	spn->draggable(drag);
+	spn->suffix(suffix);
+	spn->onChange([=](f32 val) {
+		f32* _value = spn->userData();
+		(*_value) = val;
+		if (onChange) onChange();
+	});
+	spn->value(*value);
+	return spn;
 }
 
 void GUI::destroy(Widget* widget) {

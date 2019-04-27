@@ -1,6 +1,10 @@
 #include "node_canvas.h"
 
 #include "../../log/log.h"
+#include "../../engine/sine_wave.hpp"
+#include "../../engine/lfo.hpp"
+#include "../../engine/adsr_node.hpp"
+#include "../../engine/remap.hpp"
 
 constexpr u32 NodeWidth = 68;
 constexpr u32 NodeHeight = 54;
@@ -189,6 +193,8 @@ void NodeCanvas::onMove(i32 x, i32 y) {
 				gn.y += dy;
 			}
 
+			if (m_onChange) m_onChange();
+
 			m_px = x;
 			m_py = y;
 
@@ -332,4 +338,79 @@ void NodeCanvas::deselect() {
 	m_selected.clear();
 	if (m_onSelect) m_onSelect(nullptr);
 	invalidate();
+}
+
+void NodeCanvas::load(Json json) {
+	m_system->clear();
+
+	Json nodes = json["nodes"];
+	Json connections = json["connections"];
+
+	for (u32 i = 0; i < nodes.size(); i++) {
+		u32 id = 0;
+		Json node = nodes[i];
+		auto type = node["type"].get<std::string>();
+
+		if (type == "sine") {
+			id = m_system->create<SineWave>();
+		} else if (type == "lfo") {
+			id = m_system->create<LFO>();
+		} else if (type == "adsr") {
+			id = m_system->create<ADSRNode>();
+		} else if (type == "map") {
+			id = m_system->create<Map>();
+		} else continue;
+
+		GNode& gnd = m_gnodes[id];
+		gnd.x = node["x"];
+		gnd.y = node["y"];
+		gnd.selected = false;
+		gnd.node = id;
+
+		m_system->get<Node>(id)->load(node);
+	}
+
+	// Connect
+	for (u32 i = 0; i < connections.size(); i++) {
+		Json conn = connections[i];
+		m_system->connect(conn["src"], conn["dest"], conn["destParam"]);
+	}
+}
+
+void NodeCanvas::save(Json& json) {
+	Json nodes = Json::array();
+	for (u32 nid : m_system->nodes()) {
+		if (nid == 0) continue;
+
+		Node* node = m_system->get<Node>(nid);
+		GNode gnd = m_gnodes[nid];
+		Json nodeJson;
+		nodeJson["x"] = gnd.x;
+		nodeJson["y"] = gnd.y;
+
+		std::string txt = "NULL";
+		switch (node->type()) {
+			default: break;
+			case NodeType::SineWave: txt = "sine"; break;
+			case NodeType::LFO: txt = "lfo"; break;
+			case NodeType::ADSR: txt = "adsr"; break;
+			case NodeType::Map: txt = "map"; break;
+		}
+		nodeJson["type"] = txt;
+
+		node->save(nodeJson);
+		nodes.push_back(nodeJson);
+	}
+	json["nodes"] = nodes;
+
+	Json connections = Json::array();
+	for (u32 cid : m_system->connections()) {
+		auto&& conn = m_system->getConnection(cid);
+		Json connJson;
+		connJson["src"] = conn->src;
+		connJson["dest"] = conn->dest;
+		connJson["destParam"] = conn->destParam;
+		connections.push_back(connJson);
+	}
+	json["connections"] = connections;
 }

@@ -40,4 +40,9 @@ public:
     virtual void apply(Panel* panel, std::vector<Widget*> widgets) override;
 };
 
+class FlowLayout : public Layout {
+public:
+	virtual void apply(Panel* panel, std::vector<Widget*> widgets) override;
+};
+
 #endif // SYG_LAYOUT_H

@@ -4,6 +4,7 @@
 #include "widget.h"
 
 class Spinner : public Widget {
+	friend class GUI;
 public:
 	Spinner();
 
@@ -42,9 +43,12 @@ public:
 
 	void onChange(const std::function<void(f32)>& cb) { m_onChange = cb; }
 
-private:
+	f32* userData() { return m_userData; }
+
+protected:
 	std::function<void(f32)> m_onChange;
 
+	f32* m_userData{ nullptr };
 	f32 m_value{ 0.0f }, m_min{ 0.0f }, m_max{ 1.0f }, m_step{ 0.1f };
 	u8 m_decState{ 0 }, m_incState{ 0 };
 

@@ -1,9 +1,15 @@
 #include "label.h"
 
 void Label::onDraw(Renderer& renderer) {
+	i32 tw = renderer.textWidth(m_text) + 1;
+
 	bounds().height = 22;
-	auto b = realBounds();	
-	i32 tw = renderer.textWidth(m_text)+1;
+
+	if (m_autoWidth) {
+		bounds().width = tw;
+	}
+
+	auto b = realBounds();
 	i32 tx = 0;
 	switch (m_textAlign) {
 		case Alignment::Center: tx = b.width / 2 - tw / 2; break;

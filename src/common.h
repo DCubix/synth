@@ -7,6 +7,10 @@
 #include <string>
 #include <algorithm>
 #include <array>
+#include <vector>
+#include <fstream>
+#include <sstream>
+#include <filesystem>
 
 using u8  = uint8_t;
 using u16 = uint16_t;
@@ -22,6 +26,10 @@ using f32 = float;
 using f64 = double;
 
 #define PI 3.141592654f
+
+#include "json.hpp"
+using Json = nlohmann::json;
+namespace fs = std::filesystem;
 
 namespace util {
 	inline f32 lerp(f32 a, f32 b, f32 t) {
@@ -77,6 +85,30 @@ namespace util {
 		std::array<T, N> m_data;
 		i32 m_top{ -1 };
 	};
+
+	namespace pack {
+
+		inline void saveFile(const std::string& path, const Json& json) {
+			fs::path pt(path);
+			pt.replace_extension(".sprog");
+			
+			std::ofstream fp(pt.string());
+			if (fp.good()) {
+				fp << std::setw(4) << json;
+				fp.close();
+			}
+		}
+
+		inline Json loadFile(const std::string& path) {
+			Json json;
+			std::ifstream fp(path);
+			if (fp.good()) {
+				fp >> json;
+			}
+			return json;
+		}
+	}
+
 }
 
 #endif // SY_COMMON_H

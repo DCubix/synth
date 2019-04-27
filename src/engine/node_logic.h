@@ -165,6 +165,8 @@ public:
 	~Node() = default;
 
 	virtual NodeType type() { return NodeType::None; }
+	virtual void load(Json json) { m_level = json.value("level", 1.0f); }
+	virtual void save(Json& json) { json["level"] = m_level; }
 
 	float& level() { return m_level; }
 	void level(f32 v) {
@@ -192,10 +194,13 @@ class Output : public Node {
 public:
 	Output();
 
-	virtual NodeType type() { return NodeType::Out; }
+	virtual NodeType type() override { return NodeType::Out; }
 
 	float pan() { return param(1).value; }
 	void pan(f32 v) { param(1).value = v; }
+
+	virtual void load(Json json) override;
+	virtual void save(Json& json) override;
 };
 
 class NodeSystem {
@@ -232,6 +237,7 @@ public:
 	}
 
 	void destroy(u32 id);
+	void clear();
 
 	template <class T>
 	T* get(u32 id) {
@@ -256,17 +262,11 @@ public:
 	Connection* getConnection(u32 id) { return m_connections[id].get(); }
 
 private:
-	std::vector<u32> getInputs(u32 node);
-	std::vector<u32> buildNodes(const std::vector<u32>& nodes);
-	std::vector<u32> buildNodes(u32 node);
-
 	std::array<std::unique_ptr<Connection>, SynMaxConnections> m_connections;
 	std::vector<u32> m_usedConnections;
 
 	std::array<NodePtr, SynMaxNodes> m_nodes;
-	
 	std::vector<u32> m_usedNodes;
-	std::array<f32, SynMaxNodes> m_nodeBuffer;
 
 	std::mutex m_lock;
 };

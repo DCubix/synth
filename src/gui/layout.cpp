@@ -77,3 +77,13 @@ void StackLayout::apply(Panel* panel, std::vector<Widget*> widgets) {
 		y += w->bounds().height + panel->spacing();
 	}
 }
+
+void FlowLayout::apply(Panel* panel, std::vector<Widget*> widgets) {
+	i32 x = panel->padding();
+	for (Widget* w : widgets) {
+		w->bounds().x = x;
+		w->bounds().y = panel->padding();
+		w->bounds().height = panel->bounds().height - panel->padding() * 2;
+		x += w->bounds().width + panel->spacing();
+	}
+}
