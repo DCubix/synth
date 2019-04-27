@@ -4,6 +4,7 @@
 
 constexpr u32 NodeWidth = 68;
 constexpr u32 NodeHeight = 54;
+constexpr u32 textPad = 3;
 
 NodeCanvas::NodeCanvas() {
 	m_system = std::make_unique<NodeSystem>();
@@ -13,7 +14,7 @@ NodeCanvas::NodeCanvas() {
 }
 
 static u32 inY(u32 index) {
-	return (10 * index) + (NodeHeight / 4) + 2;
+	return (10 * index) + (NodeHeight / 4) + 3;
 }
 
 void NodeCanvas::onDraw(Renderer& renderer) {
@@ -37,64 +38,51 @@ void NodeCanvas::onDraw(Renderer& renderer) {
 		GNode src = m_gnodes[conn->src];
 		GNode dest = m_gnodes[conn->dest];
 
-		i32 sy = inY(0) + src.y + 2;
-		i32 lsy = sy + 10;
-		i32 dy = inY(conn->destParam) + dest.y + 2;
-		i32 ldy = dy + 10;
+		i32 connSrcX = (src.x + b.x) + NodeWidth - (textPad + 4);
+		i32 connSrcY = (src.y + b.y) + inY(0) + textPad + 6;
 
-		i32 srcX = src.x + NodeWidth + 11;
-		i32 destX = dest.x - 6;
+		i32 connDestX = (dest.x + b.x) + textPad + 4;
+		i32 connDestY = (dest.y + b.y) + inY(conn->destParam) + textPad + 6;
+
+		connSrcY -= 2;
+		connDestY -= 2;
 
 		if (conn->src != conn->dest) {
-			f32 arrowAngle = 0.0f;
-			if (srcX > destX) {
-				i32 mid = (ldy - lsy) / 2;
+			if (connSrcX > connDestX) {
+				i32 mid = (connDestY - connSrcY) / 2;
 				renderer.curve(
-					srcX, lsy,
-					srcX + 50, lsy + mid,
-					destX - 50, ldy - mid,
-					destX, ldy,
-					255, 255, 255, 180
+					connSrcX, connSrcY,
+					connSrcX + 50, connSrcY + mid,
+					connDestX - 50, connDestY - mid,
+					connDestX, connDestY,
+					196, 212, 209
 				);
-				f32 ox = util::deCasteljau(srcX, srcX+50, destX-50, destX, 0.9f);
-				f32 oy = util::deCasteljau(lsy, lsy+mid, ldy-mid, ldy, 0.9f);
-				f32 dx = ox - destX;
-				f32 dy = oy - ldy;
-				arrowAngle = std::atan2(dy, dx);
 			} else {
-				i32 mid = (destX - srcX) / 2;
+				i32 mid = (connDestX - connSrcX) / 2;
 				renderer.curve(
-					srcX, lsy,
-					srcX + mid, lsy,
-					srcX + mid, ldy,
-					destX, ldy,
-					255, 255, 255, 180
+					connSrcX, connSrcY,
+					connSrcX + mid, connSrcY,
+					connSrcX + mid, connDestY,
+					connDestX, connDestY,
+					196, 212, 209
 				);
-				f32 ox = util::deCasteljau(srcX, srcX+mid, srcX+mid, destX, 0.9f);
-				f32 oy = util::deCasteljau(lsy, lsy, ldy, ldy, 0.9f);
-				f32 dx = ox - destX;
-				f32 dy = oy - ldy;
-				arrowAngle = std::atan2(dy, dx);
 			}
-			renderer.arrow(destX, ldy, 14, 8, arrowAngle, 255, 255, 255, 200);
+
+			i32 mx = (connDestX + connSrcX) / 2;
+			i32 my = (connDestY + connSrcY) / 2;
+			renderer.roundRect(mx - 3, my - 3, 6, 6, 6, 196, 212, 209);
 		} else {
-			i32 mid = (destX - srcX) / 2;
-			renderer.rect(srcX-3, lsy-3, 6, 6, 255, 255, 255, 200, true);
-			renderer.arrow(destX, ldy, 14, 8, -PI/2, 255, 255, 255, 200);
-			renderer.curve(
-				srcX, lsy,
-				srcX, lsy - 20,
-				srcX, ldy - 40,
-				srcX + mid, ldy - 40,
-				255, 255, 255, 180
+			const i32 rad = 10;
+			const i32 w = rad * 3;
+			const i32 nw = std::abs(connDestX - connSrcX) + w - 1;
+			renderer.roundRect(
+				connDestX - w / 2, connDestY,
+				nw,	NodeHeight - 16, rad,
+				196, 212, 209
 			);
-			renderer.curve(
-				destX - mid, lsy - 40,
-				destX, lsy - 40,
-				destX, ldy - 20,
-				destX, ldy,
-				255, 255, 255, 180
-			);
+			i32 mx = (connDestX + connSrcX) / 2;
+			i32 my = connDestY + NodeHeight - 16;
+			renderer.roundRect(mx - 3, my - 3, 6, 6, 6, 196, 212, 209);
 		}
 	}
 
@@ -125,19 +113,13 @@ void NodeCanvas::onDraw(Renderer& renderer) {
 
 			for (u32 i = 0; i < node->paramCount(); i++) {
 				i32 py = inY(i) + ny;
-				renderer.textSmall(nx + 4, py + 4, node->paramName(i), 0, 0, 0, 200);
+				renderer.textSmall(nx + textPad, py + textPad, "\x9", 0, 0, 0, 200);
+				renderer.textSmall(nx + textPad + 8, py + textPad, node->paramName(i), 0, 0, 0, 200);
 			}
 			renderer.popClipping();
 
-			for (u32 i = 0; i < node->paramCount(); i++) {
-				i32 py = inY(i) + ny;
-				i32 ly = py + 7;
-				renderer.line(nx, ly, nx - 8, ly, 255, 255, 255, 180, 2);
-			}
-
 			i32 py = inY(0) + ny;
-			i32 ly = py + 7;
-			renderer.line(nx + NodeWidth, ly, nx + NodeWidth + 8, ly, 255, 255, 255, 180, 2);
+			renderer.textSmall(nx + NodeWidth - (textPad + 8), py + textPad, "\x9", 0, 0, 0, 200);
 
 			if (gnode.selected) {
 				renderer.rect(nx + 2, ny + 2, NodeWidth - 4, NodeHeight - 4, 255, 255, 255, 50, true);
@@ -147,27 +129,47 @@ void NodeCanvas::onDraw(Renderer& renderer) {
 		} else {
 			renderer.flatPanel(nx, ny, NodeWidth, NodeHeight, 0, 2, 0.2f);
 			i32 py = inY(0) + ny;
-			i32 ly = py + 7;
-			renderer.line(nx, ly, nx - 8, ly, 255, 255, 255, 180, 6);
+			renderer.textSmall(nx + textPad, py + textPad, "\x9", 0, 0, 0, 200);
 		}
+	}
+
+	// Draw dots
+	for (u32 cid : m_system->connections()) {
+		auto conn = m_system->getConnection(cid);
+		GNode src = m_gnodes[conn->src];
+		GNode dest = m_gnodes[conn->dest];
+
+		i32 connSrcX = (src.x + b.x) + NodeWidth - (textPad + 4);
+		i32 connSrcY = (src.y + b.y) + inY(0) + textPad + 6;
+
+		i32 connDestX = (dest.x + b.x) + textPad + 4;
+		i32 connDestY = (dest.y + b.y) + inY(conn->destParam) + textPad + 6;
+
+		renderer.textSmall(connSrcX - 4, connSrcY - 6, "\x7", 196, 212, 209);
+		renderer.textSmall(connDestX - 4, connDestY - 6, "\x7", 196, 212, 209);
 	}
 
 	if (m_state == Linking) {
 		GNode gnode = m_gnodes[m_link.src];
 		i32 nx = gnode.x + b.x;
 		i32 ny = gnode.y + b.y;
-		i32 py = inY(0) + ny;
-		i32 ly = py + 7;
+		
+		i32 connSrcX = nx + NodeWidth - (textPad + 4);
+		i32 connSrcY = ny + inY(0) + textPad + 4;
+		i32 mid = ((m_px + b.x) + connSrcX) / 2;
+
+		renderer.textSmall(connSrcX - 4, connSrcY - 4, "\x7", 196, 212, 209);
 		renderer.curve(
-			nx + NodeWidth + 8, ly,
-			nx + NodeWidth + 8 + 50, ly,
-			nx + NodeWidth + 8 + 50, m_py,
-			m_px, m_py,
-			255, 255, 255, 180
+			connSrcX, connSrcY,
+			mid, connSrcY,
+			mid, m_py + b.y,
+			m_px + b.x, m_py + b.y,
+			196, 212, 209
 		);
 	}
 
 	renderer.popClipping();
+	m_time += 0.01f;
 }
 
 void NodeCanvas::onClick(u8 button, i32 x, i32 y) {
@@ -204,15 +206,24 @@ void NodeCanvas::onMove(i32 x, i32 y) {
 void NodeCanvas::onPress(u8 button, i32 x, i32 y) {
 	auto b = bounds();
 	if (button == SDL_BUTTON_LEFT) {
+		bool clickConnector = false;
 		bool hitSomething = false;
 		u32 hit = UINT32_MAX;
+
 		for (u32 nid : m_system->nodes()) {
 			GNode& gnode = m_gnodes[nid];
 			Node* node = m_system->get<Node>(nid);
 			i32 nx = gnode.x;
 			i32 ny = gnode.y;
+			i32 py = inY(0) + ny;
+			i32 px = nx + NodeWidth - (textPad + 8);
 
-			if (util::hits(x, y, nx, ny, NodeWidth, NodeHeight)) {
+			if (util::hits(x, y, px, py, 8, 12)) {
+				m_link.src = nid;
+				m_link.active = true;
+				clickConnector = true;
+				break;
+			} else if (util::hits(x, y, nx, ny, NodeWidth, NodeHeight)) {
 				if (!m_multiSelect) {
 					for (auto&& nid : m_selected) {
 						m_gnodes[nid].selected = false;
@@ -228,38 +239,50 @@ void NodeCanvas::onPress(u8 button, i32 x, i32 y) {
 				hit = nid;
 				hitSomething = true;
 				invalidate();
-				//break;
-			} else {
-				i32 py = inY(0) + ny;
-				i32 ly = py + 7;
-				if (util::hits(x, y, nx + NodeWidth, ly - 4, 8, 8)) {
-					m_link.src = nid;
-					m_link.active = true;
-					break;
-				} else {
-					for (u32 i = 0; i < node->paramCount(); i++) {
-						i32 py = inY(i) + ny;
-						i32 ly = py + 7;
-						if (util::hits(x, y, nx - 10, ly - 5, 10, 10)) {
-							if (node->param(i).connected) {
-								auto cons = m_system->getConnections(nid, i);
-								for (u32 con : cons)
-									m_system->disconnect(con);
-								if (m_onConnect) m_onConnect();
-								invalidate();
-							}
-							break;
-						}
-					}
-				}
 			}
 		}
 
-		if (!hitSomething) {
-			deselect();
-			m_state = m_link.active ? Linking : Selecting;
+		if (!clickConnector) {
+			if (!hitSomething) {
+				deselect();
+				m_state = None;
+
+				// Handle disconnections
+				for (u32 cid : m_system->connections()) {
+					auto conn = m_system->getConnection(cid);
+					GNode src = m_gnodes[conn->src];
+					GNode dest = m_gnodes[conn->dest];
+
+					i32 connSrcX = src.x + NodeWidth - (textPad + 4);
+					i32 connSrcY = src.y + inY(0) + textPad + 6;
+
+					i32 connDestX = dest.x + textPad + 4;
+					i32 connDestY = dest.y + inY(conn->destParam) + textPad + 6;
+
+					connSrcY -= 2;
+					connDestY -= 2;
+
+					i32 mx = 0, my = 0;
+					if (conn->src != conn->dest) {
+						mx = (connDestX + connSrcX) / 2;
+						my = (connDestY + connSrcY) / 2;
+					} else {
+						mx = (connDestX + connSrcX) / 2;
+						my = connDestY + NodeHeight - 16;
+					}
+
+					if (util::hits(x, y, mx - 5, my - 5, 10, 10)) {
+						m_system->disconnect(cid);
+						if (m_onConnect) m_onConnect();
+						invalidate();
+						break;
+					}
+				}
+			} else {
+				m_state = Moving;
+			}
 		} else {
-			m_state = Moving;
+			m_state = Linking;
 		}
 		m_px = x;
 		m_py = y;
@@ -277,8 +300,7 @@ void NodeCanvas::onRelease(u8 button, i32 x, i32 y) {
 
 		for (u32 i = 0; i < node->paramCount(); i++) {
 			i32 py = inY(i) + ny;
-			i32 ly = py + 7;
-			if (util::hits(x, y, nx - 10, ly - 5, 10, 10) /*&& nid != m_link.src*/ && m_link.active) {
+			if (util::hits(x, y, nx + textPad, py + textPad, 8, 6) /*&& nid != m_link.src*/ && m_link.active) {
 				if (m_system->connect(m_link.src, nid, i) != UINT32_MAX) {
 					m_link.src = 0;
 					m_link.active = false;

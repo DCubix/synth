@@ -53,6 +53,7 @@ void GUI::render(i32 width, i32 height) {
 		m_clear = false;
 	}
 
+	SDL_SetRenderDrawBlendMode(m_renderer->sdlRenderer(), SDL_BLENDMODE_BLEND);
 	for (auto&& widget : m_widgets) {
 		auto b = widget->bounds();
 		if (widget->parent() == nullptr) {

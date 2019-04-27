@@ -1,6 +1,8 @@
 #ifndef SY_ADSR_H
 #define SY_ADSR_H
 
+#include <functional>
+
 #include "../common.h"
 
 class ADSR {
@@ -78,8 +80,9 @@ public:
 	f32 sample();
 
 	void reset();
-
 	bool active{ false };
+
+	void setOnFinish(const std::function<void()>& cb) { m_onFinish = cb; }
 
 private:
 	State m_state;
@@ -98,6 +101,8 @@ private:
 		m_out;
 
 	f32 coef(f32 rate, f32 targetRatio);
+
+	std::function<void()> m_onFinish;
 
 };
 

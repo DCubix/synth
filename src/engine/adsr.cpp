@@ -20,10 +20,11 @@ f32 ADSR::sample() {
 		case Sustain: break;
 		case Release: {
 			m_out = m_releaseBase + m_out * m_releaseCoef;
-			if (m_out <= 0.0f) {
+			if (m_out <= 1e-5f) {
 				m_out = 0.0f;
 				m_state = Idle;
 				active = false;
+				if (m_onFinish) m_onFinish();
 			}
 		} break;
 	}

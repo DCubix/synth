@@ -119,6 +119,16 @@ u32 NodeSystem::getConnection(u32 src, u32 dest, u32 param) {
 	return UINT32_MAX;
 }
 
+u32 NodeSystem::getNodeConnection(u32 src, u32 dest) {
+	for (u32 cid : m_usedConnections) {
+		Connection* conn = m_connections[cid].get();
+		if (conn->src == src && conn->dest == dest) {
+			return cid;
+		}
+	}
+	return UINT32_MAX;
+}
+
 std::vector<u32> NodeSystem::getAllConnections(u32 node) {
 	std::vector<u32> res;
 	for (u32 cid : m_usedConnections) {
@@ -130,7 +140,7 @@ std::vector<u32> NodeSystem::getAllConnections(u32 node) {
 	return res;
 }
 
-static void process(NodeSystem* sys, Node* node, ProgramBuilder& out) {
+static void process(NodeSystem* sys, Node* node, Node* prev, ProgramBuilder& out) {
 	auto type = node->type();
 	const u32 id = node->id();
 
@@ -157,6 +167,11 @@ static void process(NodeSystem* sys, Node* node, ProgramBuilder& out) {
 			Writer* mn = (Writer*)node;
 			out.pushp(id, &mn->channel);
 		} break;
+		case NodeType::LFO: {
+			LFO* mn = (LFO*)node;
+			out.pushp(id, &mn->min);
+			out.pushp(id, &mn->max);
+		} break;
 		default: break;
 	}
 
@@ -168,13 +183,14 @@ static void process(NodeSystem* sys, Node* node, ProgramBuilder& out) {
 			for (u32 cid : conns) {
 				auto conn = sys->getConnection(cid);
 				if (conn) {
-					if (conn->src == conn->dest) { // Handle loops
+					if (conn->src == conn->dest || 
+						sys->getNodeConnection(conn->dest, conn->src) != UINT32_MAX) { // Handle loops
 						out.push(id, conn->dest); // Channel
 						out.push(id, 1.0f); // Lvl
 						out.read(id);
 					} else {
 						Node* nd = sys->get<Node>(conn->src);
-						process(sys, nd, out);
+						process(sys, nd, node, out);
 					}
 				}
 			}
@@ -195,7 +211,7 @@ static void process(NodeSystem* sys, Node* node, ProgramBuilder& out) {
 
 Program NodeSystem::compile() {
 	ProgramBuilder builder;
-	process(this, m_nodes[0].get(), builder);
+	process(this, m_nodes[0].get(), nullptr, builder);
 	return builder.build();
 }
 
@@ -266,6 +282,7 @@ void SynthVM::load(const Program& program) {
 Sample SynthVM::execute(f32 sampleRate) {
 #define PUSH(x) if (m_stack.canPush()) { m_stack.push((x)); }
 #define POP(x) if (!m_stack.empty()) { x = m_stack.top(); m_stack.pop(); }
+#define POPA(x) if (!m_stack.empty()) { x += m_stack.top(); m_stack.pop(); }
 	
 	u32 i = 0, e = 0 /*Env*/;
 	f32 result = 0.0f;
@@ -282,12 +299,10 @@ Sample SynthVM::execute(f32 sampleRate) {
 				POP(pan);
 
 				// mix all the inputs
-				f32 valmix = 0.0f;
 				while (!m_stack.empty()) {
-					POP(val);
-					valmix += val;
+					POPA(val);
 				}
-				result = valmix * level;
+				result = val * level;
 				m_out = { result * (1.0f - pan), result * pan };
 			} break;
 			case OpSine: {
@@ -298,7 +313,10 @@ Sample SynthVM::execute(f32 sampleRate) {
 				POP(lvl);
 				POP(lvlm);
 				POP(offset);
-				POP(freqMod);
+				//POP(freqMod);
+				while (!m_stack.empty()) {
+					POPA(freqMod);
+				}
 				f32 freqVal = m_phases[i++].advance(m_frequency + offset, sampleRate) + freqMod;
 				f32 s = ::sinf(freqVal);
 				result = s * lvl * lvlm;
@@ -308,14 +326,15 @@ Sample SynthVM::execute(f32 sampleRate) {
 				f32 freq = 0.0f;
 				f32 vmin = 0.0f;
 				f32 vmax = 0.0f;
-				f32 lvl = 1.0f;
+				f32 lvl = 1.0f, lvlm = 1.0f;
 				POP(lvl);
+				POP(lvlm);
+				POP(freq);
 				POP(vmax);
 				POP(vmin);
-				POP(freq);
 				f32 freqVal = m_phases[i++].advance(freq, sampleRate);
 				f32 s = vmin + (::sinf(freqVal) * 0.5f + 0.5f) * (vmax - vmin);
-				result = s * lvl;
+				result = s * lvl * lvlm;
 				PUSH(result);
 			} break;
 			case OpADSR: {
@@ -329,7 +348,7 @@ Sample SynthVM::execute(f32 sampleRate) {
 				ADSR& env = m_envs[e++];
 				env.attack(a * sampleRate);
 				env.decay(d * sampleRate);
-				env.sustain(s * sampleRate);
+				env.sustain(s);
 				env.release(r * sampleRate);
 				result = env.sample() * lvl;
 				PUSH(result);
@@ -373,6 +392,11 @@ Sample SynthVM::execute(f32 sampleRate) {
 
 Voice::Voice() {
 	m_vm = std::make_unique<SynthVM>();
+	for (auto&& adsr : m_vm->envelopes()) {
+		adsr.setOnFinish([&]() {
+			free();
+		});
+	}
 }
 
 void Voice::setNote(u32 note) {
@@ -427,14 +451,6 @@ Sample Synth::sample() {
 	for (int i = 0; i < SynMaxVoices; i++) {
 		Voice& voice = *m_voices[i].get();
 		auto s = voice.sample(m_sampleRate);
-
-		bool done = true;
-		for (auto&& env : voice.vm().envelopes()) {
-			if (env.active) done = false; break;
-		}
-
-		if (done) voice.free();
-
 		out.first += s.first;
 		out.second += s.second;
 	}

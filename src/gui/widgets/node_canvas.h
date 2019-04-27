@@ -71,6 +71,7 @@ private:
 		m_sw{ 0 }, m_sh{ 0 };
 
 	Link m_link;
+	f32 m_time{ 0.0f };
 };
 
 #endif // SYG_NODE_CANVAS_H

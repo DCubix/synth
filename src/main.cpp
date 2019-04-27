@@ -137,7 +137,7 @@ int main(int argc, char** argv) {
 
 	Panel* nodeButtonsPanel = gui->create<Panel>();
 	nodeButtonsPanel->layoutParam(BorderLayoutPosition::Bottom);
-	nodeButtonsPanel->bounds().height = 48;
+	nodeButtonsPanel->bounds().height = 36;
 	nodeButtonsPanel->gridWidth(6);
 	nodeButtonsPanel->gridHeight(2);
 	optionsPanel->add(nodeButtonsPanel);
@@ -186,24 +186,8 @@ int main(int argc, char** argv) {
 	});
 	buttonsPanel->add(newMap);
 
-	Button* newReader = gui->create<Button>();
-	newReader->configure(1, 2, 2);
-	newReader->text("Reader");
-	newReader->onClick([&](u8 btn, i32 x, i32 y) {
-		cnv->create<Reader>();
-	});
-	buttonsPanel->add(newReader);
-
-	Button* newWriter = gui->create<Button>();
-	newWriter->configure(1, 4, 2);
-	newWriter->text("Writer");
-	newWriter->onClick([&](u8 btn, i32 x, i32 y) {
-		cnv->create<Writer>();
-	});
-	buttonsPanel->add(newWriter);
-
 	Keyboard* kb = gui->create<Keyboard>();
-	kb->bounds().height = 72;
+	kb->bounds().height = 64;
 	kb->layoutParam(BorderLayoutPosition::Bottom);
 	root->add(kb);
 
@@ -234,13 +218,14 @@ int main(int argc, char** argv) {
 						Node* nd = cnv->system()->get<Node>(nid);
 						cnv->system()->destroy(nd->id());
 						cnv->deselect();
+						vm->setProgram(cnv->system()->compile());
 					} else {
 						vm->noteOn(36);
 						vm->noteOn(40);
 					}
 				});
-				btnDel->configure(0, 5, 1, 2);
-				btnDel->text("X");
+				btnDel->configure(0, 3, 3, 2);
+				btnDel->text("Delete");
 				nodeButtonsPanel->add(btnDel);
 			}
 
@@ -274,25 +259,27 @@ int main(int argc, char** argv) {
 
 					Spinner* vmin = gui->create<Spinner>();
 					vmin->onChange([&](f32 value) {
-						cnv->current()->param(1).value = value;
+						LFO* lfo = (LFO*)cnv->current();
+						lfo->min = value;
 					});
 					vmin->configure(row++, 0, 4);
 					vmin->suffix(" Min.");
-					vmin->minimum(-999.0f);
+					vmin->minimum(-9999.0f);
 					vmin->maximum(9999.0f);
-					vmin->value(nd->param(1).value);
+					vmin->value(((LFO*)nd)->min);
 					vmin->draggable(false);
 					options->add(vmin);
 
 					Spinner* vmax = gui->create<Spinner>();
 					vmax->onChange([&](f32 value) {
-						cnv->current()->param(2).value = value;
+						LFO* lfo = (LFO*)cnv->current();
+						lfo->max = value;
 					});
 					vmax->configure(row++, 0, 4);
 					vmax->suffix(" Max.");
-					vmax->minimum(-999.0f);
+					vmax->minimum(-9999.0f);
 					vmax->maximum(9999.0f);
-					vmax->value(nd->param(2).value);
+					vmax->value(((LFO*)nd)->max);
 					vmax->draggable(false);
 					options->add(vmax);
 				} break;
@@ -338,38 +325,6 @@ int main(int argc, char** argv) {
 						a->draggable(false);
 						options->add(a);
 					}
-				} break;
-				case NodeType::Reader: {
-					optTitle->text("Node Options (Reader)");
-
-					Reader* rnd = (Reader*)nd;
-					Spinner* a = gui->create<Spinner>();
-					a->onChange([=](f32 value) {
-						Reader* rnd = (Reader*)cnv->current();
-						rnd->channel = u32(value);
-					});
-					a->configure(row++, 0, 4);
-					a->suffix(" Ch.");
-					a->minimum(0);
-					a->maximum(32);
-					a->value(rnd->channel);
-					options->add(a);
-				} break;
-				case NodeType::Writer: {
-					optTitle->text("Node Options (Writer)");
-
-					Writer* rnd = (Writer*)nd;
-					Spinner* a = gui->create<Spinner>();
-					a->onChange([=](f32 value) {
-						Writer* rnd = (Writer*)cnv->current();
-						rnd->channel = u32(value);
-					});
-					a->configure(row++, 0, 4);
-					a->suffix(" Ch.");
-					a->minimum(0);
-					a->maximum(32);
-					a->value(rnd->channel);
-					options->add(a);
 				} break;
 				default: break;
 			}

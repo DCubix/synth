@@ -245,6 +245,7 @@ public:
 	u32 getConnection(u32 dest, u32 param);
 	std::vector<u32> getConnections(u32 dest, u32 param);
 	u32 getConnection(u32 src, u32 dest, u32 param);
+	u32 getNodeConnection(u32 src, u32 dest);
 	std::vector<u32> getAllConnections(u32 node);
 
 	Program compile();

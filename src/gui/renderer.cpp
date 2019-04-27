@@ -61,8 +61,6 @@ Renderer::Renderer(SDL_Renderer* ren)
 
 		SDL_SetTextureBlendMode(m_fontSmall, SDL_BLENDMODE_BLEND);
 	}
-
-	SDL_SetRenderDrawBlendMode(m_ren, SDL_BLENDMODE_BLEND);
 }
 
 Renderer::~Renderer() {
@@ -82,7 +80,28 @@ void Renderer::curve(
 ) {
 	Sint16 vx[] = { x1, x2, x3, x4 };
 	Sint16 vy[] = { y1, y2, y3, y4 };
-	bezierRGBA(m_ren, vx, vy, 4, 100, r, g, b, a);
+	bezierRGBA(m_ren, vx, vy, 4, 16, r, g, b, a);
+}
+
+void Renderer::multiCurve(const std::vector<i32>& positions, u8 r, u8 g, u8 b, u8 a) {
+	std::vector<Sint16> vx, vy;
+	vx.reserve(positions.size()/2);
+	vy.reserve(positions.size()/2);
+
+	for (u32 i = 0; i < positions.size(); i += 2) {
+		vx.push_back(positions[i]);
+		vy.push_back(positions[i + 1]);
+	}
+
+	bezierRGBA(m_ren, vx.data(), vy.data(), vx.size(), 16, r, g, b, a);
+}
+
+void Renderer::roundRect(i32 x, i32 y, i32 w, i32 h, i32 rad, u8 r, u8 g, u8 b, u8 a) {
+	roundedRectangleRGBA(m_ren, x, y, x + w, y + h, rad, r, g, b, a);
+}
+
+void Renderer::arc(i32 x, i32 y, i32 rad, i32 start, i32 end, u8 r, u8 g, u8 b, u8 a) {
+	arcRGBA(m_ren, x, y, rad, start, end, r, g, b, a);
 }
 
 void Renderer::rect(i32 x, i32 y, i32 w, i32 h, u8 r, u8 g, u8 b, u8 a, bool fill) {
@@ -130,12 +149,6 @@ void Renderer::panel(i32 x, i32 y, i32 w, i32 h, i32 sx, i32 sy, f32 shadow) {
 void Renderer::button(i32 x, i32 y, i32 w, i32 h, u32 state) {
 	const u32 TS = 64;
 	u32 ox = state * TS;
-
-	////Shadow
-	//const u32 sz = 4;
-	//const u32 tsz = sz * 2 < 32 ? sz * 2 : sz;
-	//patch((x - sz / 2), (y - sz / 2) + 1, w + sz, h + sz, 0, 0, 96, 96, sz, tsz);
-
 	patch(x, y, w, h, ox, 96, TS, TS, 4);
 }
 
@@ -186,6 +199,8 @@ void Renderer::pushClipping(i32 x, i32 y, i32 w, i32 h) {
 
 	SDL_Rect cr = { x, y, w, h };
 	m_clipRects.push(cr);
+
+	SDL_SetRenderDrawBlendMode(m_ren, SDL_BLENDMODE_BLEND);
 	SDL_RenderSetClipRect(m_ren, &cr);
 }
 
@@ -239,6 +254,8 @@ void Renderer::patch(i32 x, i32 y, i32 w, i32 h, i32 sx, i32 sy, i32 sw, i32 sh,
 	skin(x + (w - pad), y, pad, pad, sx + (sw - tpad), sy, tpad, tpad); // T
 	skin(x + (w - pad), y + pad, pad, h - pad * 2, sx + (sw - tpad), sy + tpad, tpad, sh - tpad * 2); // M
 	skin(x + (w - pad), y + (h - pad), pad, pad, sx + (sw - tpad), sy + (sh - tpad), tpad, tpad); // B
+
+	//rect(x, y, w, h, 255, 0, 0);
 }
 
 void Renderer::textGen(SDL_Texture* font, i32 fw, i32 fh, i32 x, i32 y, const std::string& str, u8 r, u8 g, u8 b, u8 a) {
@@ -249,7 +266,7 @@ void Renderer::textGen(SDL_Texture* font, i32 fw, i32 fh, i32 x, i32 y, const st
 			tx = x;
 			ty += 12;
 		} else {
-			if (!::isspace(c)) putChar(font, fw, fh, tx, ty, c, r, g, b, a);
+			if (c != ' ') putChar(font, fw, fh, tx, ty, c, r, g, b, a);
 		}
 		tx += 8;
 	}
