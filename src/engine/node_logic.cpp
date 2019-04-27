@@ -364,13 +364,25 @@ Sample SynthVM::execute(f32 sampleRate) {
 	return m_out;
 }
 
+ADSR* SynthVM::getLongestEnvelope() {
+	f32 time = -1.0f;
+	ADSR* env = nullptr;
+	for (auto&& aenv : m_envs) {
+		if (aenv.totalTime() > time) {
+			env = &aenv;
+			time = aenv.totalTime();
+		}
+	}
+	return env;
+}
+
 Voice::Voice() {
 	m_vm = std::make_unique<SynthVM>();
-	for (auto&& adsr : m_vm->envelopes()) {
+	/*for (auto&& adsr : m_vm->envelopes()) {
 		adsr.setOnFinish([&]() {
 			free();
 		});
-	}
+	}*/
 }
 
 void Voice::setNote(u32 note) {
@@ -425,6 +437,9 @@ Sample Synth::sample() {
 	for (int i = 0; i < SynMaxVoices; i++) {
 		Voice& voice = *m_voices[i].get();
 		auto s = voice.sample(m_sampleRate);
+
+		if (!voice.vm().getLongestEnvelope()->active) voice.free();
+
 		out.first += s.first;
 		out.second += s.second;
 	}

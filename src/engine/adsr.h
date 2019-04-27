@@ -84,6 +84,8 @@ public:
 
 	void setOnFinish(const std::function<void()>& cb) { m_onFinish = cb; }
 
+	f32 totalTime() const { return m_attack + m_release + m_decay; }
+
 private:
 	State m_state;
 	f32 m_attack,

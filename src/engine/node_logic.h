@@ -82,6 +82,8 @@ public:
 	std::array<ADSR, 128>& envelopes() { return m_envs; }
 	u32 usedEnvelopes() const { return m_usedEnvs; }
 
+	ADSR* getLongestEnvelope();
+
 private:
 	f32 m_frequency{ 220.0f };
 
