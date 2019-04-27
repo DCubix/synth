@@ -181,6 +181,10 @@ static void process(NodeSystem* sys, Node* node, Node* prev, ProgramBuilder& out
 			out.pushp(id, &mn->min);
 			out.pushp(id, &mn->max);
 		} break;
+		case NodeType::Value: {
+			Value* mn = (Value*)node;
+			out.pushp(id, &mn->value);
+		} break;
 		default: break;
 	}
 
@@ -214,6 +218,7 @@ static void process(NodeSystem* sys, Node* node, Node* prev, ProgramBuilder& out
 		case NodeType::Map: out.map(id); break;
 		case NodeType::Reader: out.read(id); break;
 		case NodeType::Writer: out.write(id); break;
+		case NodeType::Value: out.value(id, ((Value*)node)->value); break;
 		default: break;
 	}
 }
@@ -242,19 +247,18 @@ void Output::save(Json& json) {
 
 SynthVM::SynthVM() {
 	load(Program());
-	m_stack.clear();
 }
 
 void SynthVM::load(const Program& program) {
 	m_lock.lock();
 	m_program = program;
+	m_storage.fill(0.0f);
 	m_stack.clear();
 	m_lock.unlock();
-	m_storage.fill(0.0f);
 }
 
 Sample SynthVM::execute(f32 sampleRate) {
-#define PUSH(x) if (m_stack.canPush()) { m_stack.push((x)); }
+#define PUSH(x) if (m_stack.canPush()) m_stack.push((x))
 #define POP(x) if (!m_stack.empty()) { x = m_stack.top(); m_stack.pop(); }
 #define POPA(x) if (!m_stack.empty()) { x += m_stack.top(); m_stack.pop(); }
 	
@@ -287,7 +291,6 @@ Sample SynthVM::execute(f32 sampleRate) {
 				POP(lvl);
 				POP(lvlm);
 				POP(offset);
-				//POP(freqMod);
 				while (!m_stack.empty()) {
 					POPA(freqMod);
 				}
@@ -355,6 +358,13 @@ Sample SynthVM::execute(f32 sampleRate) {
 				POP(chan);
 				result = m_storage[u32(chan) % m_storage.size()] * lvl;
 				PUSH(result);
+			} break;
+			case OpValue: {
+				f32 lvl = 1.0f;
+				f32 val = 0.0f;
+				POP(lvl);
+				POP(val);
+				PUSH(val * lvl);
 			} break;
 		}
 		// Write result to storage
@@ -465,4 +475,14 @@ Voice* Synth::findFreeVoice() {
 		if (!voice->active()) return voice.get();
 	}
 	return nullptr;
+}
+
+void Value::load(Json json) {
+	Node::load(json);
+	value = json.value("value", 0.0f);
+}
+
+void Value::save(Json& json) {
+	Node::save(json);
+	json["value"] = value;
 }

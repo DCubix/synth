@@ -45,10 +45,10 @@ namespace util {
 	}
 
 	inline bool hits(i32 x, i32 y, i32 bx, i32 by, i32 bw, i32 bh) {
-		return x >= bx &&
-			x <= bx + bw &&
-			y >= by &&
-			y <= by + bh;
+		return x > bx &&
+			x < bx + bw &&
+			y > by &&
+			y < by + bh;
 	}
 	
 	inline bool overlap(i32 a, i32 alen, i32 b, i32 blen) {

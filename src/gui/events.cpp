@@ -6,10 +6,10 @@
 
 bool Element::hits(i32 x, i32 y) {
 	auto b = realBounds();
-	return x >= b.x &&
-		x <= b.x + b.width &&
-		y >= b.y &&
-		y <= b.y + b.height;
+	return x > b.x &&
+		x < b.x + b.width &&
+		y > b.y &&
+		y < b.y + b.height;
 }
 
 void EventHandler::subscribe(Element* element) {

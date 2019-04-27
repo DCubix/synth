@@ -2,6 +2,7 @@
 #define SYE_NODE_H
 
 #include <array>
+#include <stack>
 #include <vector>
 #include <string>
 #include <memory>
@@ -36,7 +37,8 @@ enum OpCode {
 	OpMap,
 	OpWrite,
 	OpRead,
-	OpNodeID
+	OpNodeID,
+	OpValue
 };
 
 struct Instruction {
@@ -62,6 +64,7 @@ public:
 	inline ProgramBuilder& map(u32 id) { m_program.push_back({ OpMap, 0, nullptr, id }); return *this; }
 	inline ProgramBuilder& read(u32 id) { m_program.push_back({ OpRead, 0, nullptr, id }); return *this; }
 	inline ProgramBuilder& write(u32 id) { m_program.push_back({ OpWrite, 0, nullptr, id }); return *this; }
+	inline ProgramBuilder& value(u32 id, f32 value) { m_program.push_back({ OpValue, value, nullptr, id }); return *this; }
 
 	Program build() const { return m_program; }
 
@@ -87,7 +90,7 @@ public:
 private:
 	f32 m_frequency{ 220.0f };
 
-	util::Stack<f32, 1024> m_stack{};
+	util::Stack<f32, 512> m_stack;
 
 	Program m_program;
 	Sample m_out{ 0.0f, 0.0f };
@@ -203,6 +206,16 @@ public:
 
 	virtual void load(Json json) override;
 	virtual void save(Json& json) override;
+};
+
+class Value : public Node {
+public:
+	virtual NodeType type() override { return NodeType::Value; }
+
+	virtual void load(Json json) override;
+	virtual void save(Json& json) override;
+
+	f32 value{ 0.0f };
 };
 
 class NodeSystem {

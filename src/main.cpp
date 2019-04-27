@@ -201,6 +201,14 @@ int main(int argc, char** argv) {
 	});
 	buttonsPanel->add(newMap);
 
+	Button* newValue = gui->create<Button>();
+	newValue->configure(1, 2, 2);
+	newValue->text("Value");
+	newValue->onClick([&](u8 btn, i32 x, i32 y) {
+		cnv->create<Value>();
+	});
+	buttonsPanel->add(newValue);
+
 	Label* lblFile = gui->create<Label>();
 	lblFile->text("*");
 	lblFile->autoWidth(true);
@@ -373,6 +381,16 @@ int main(int argc, char** argv) {
 			switch (nd->type()) {
 				case NodeType::Out: optTitle->text("Node Options (Out)"); break;
 				case NodeType::SineWave: optTitle->text("Node Options (Sine)"); break;
+				case NodeType::Value: {
+					optTitle->text("Node Options (Value)");
+					Value* val = (Value*)nd;
+					Spinner* a = gui->spinner(
+						&val->value, -9999, 9999,
+						" Val.", true, onChange
+					);
+					a->configure(row++, 0, 4);
+					options->add(a);
+				} break;
 				case NodeType::LFO: {
 					optTitle->text("Node Options (LFO)");
 

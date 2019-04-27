@@ -359,6 +359,8 @@ void NodeCanvas::load(Json json) {
 			id = m_system->create<ADSRNode>();
 		} else if (type == "map") {
 			id = m_system->create<Map>();
+		} else if (type == "value") {
+			id = m_system->create<Value>();
 		} else continue;
 
 		GNode& gnd = m_gnodes[id];
@@ -395,6 +397,7 @@ void NodeCanvas::save(Json& json) {
 			case NodeType::LFO: txt = "lfo"; break;
 			case NodeType::ADSR: txt = "adsr"; break;
 			case NodeType::Map: txt = "map"; break;
+			case NodeType::Value: txt = "value"; break;
 		}
 		nodeJson["type"] = txt;
 
