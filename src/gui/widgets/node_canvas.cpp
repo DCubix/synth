@@ -6,7 +6,7 @@
 #include "../../engine/adsr_node.hpp"
 #include "../../engine/remap.hpp"
 
-constexpr u32 NodeWidth = 68;
+constexpr u32 NodeWidth = 72;
 constexpr u32 textPad = 3;
 constexpr u32 GridSize = 8;
 
