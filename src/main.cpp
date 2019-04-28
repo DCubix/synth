@@ -75,8 +75,8 @@ void callback(void* userdata, Uint8* stream, int len) {
 
 	for (int i = 0; i < flen; i+=2) {
 		auto s = sys->sample();
-		fstream[i + 0] = s.first;
-		fstream[i + 1] = s.second;
+		fstream[i + 0] = s.L;
+		fstream[i + 1] = s.R;
 	}
 }
 
@@ -141,13 +141,13 @@ int main(int argc, char** argv) {
 	optTitle->bounds().height = 22;
 	optTitle->text("Node Options");
 	optTitle->textAlign(Label::Center);
-	sidePanel->add(optTitle);
 
 	Panel* optionsPanel = gui->create<Panel>();
 	optionsPanel->padding(0);
 	optionsPanel->spacing(0);
 	optionsPanel->setLayout(new BorderLayout());
-	optionsPanel->layoutParam(BorderLayoutPosition::Center);
+	optionsPanel->layoutParam(BorderLayoutPosition::Top);
+	optionsPanel->bounds().height = 240;
 	sidePanel->add(optionsPanel);
 
 	Panel* nodeButtonsPanel = gui->create<Panel>();
@@ -161,6 +161,8 @@ int main(int argc, char** argv) {
 	options->setLayout(new StackLayout());
 	options->layoutParam(BorderLayoutPosition::Center);
 	optionsPanel->add(options);
+
+	optionsPanel->add(optTitle);
 
 	Panel* buttonsPanel = gui->create<Panel>();
 	buttonsPanel->layoutParam(BorderLayoutPosition::Bottom);
@@ -209,9 +211,80 @@ int main(int argc, char** argv) {
 	});
 	buttonsPanel->add(newValue);
 
+	Button* newMul = gui->create<Button>();
+	newMul->configure(1, 4, 2);
+	newMul->text("Mul");
+	newMul->onClick([&](u8 btn, i32 x, i32 y) {
+		cnv->create<Mul>();
+	});
+	buttonsPanel->add(newMul);
+
 	Label* lblFile = gui->create<Label>();
 	lblFile->text("*");
 	lblFile->autoWidth(true);
+
+	auto onChange = [&]() { saved = false; lblFile->text(savedFile + "*"); };
+
+	// EFFECTS
+	Panel* effectsPanel = gui->create<Panel>();
+	effectsPanel->padding(2);
+	effectsPanel->setLayout(new StackLayout());
+	effectsPanel->layoutParam(BorderLayoutPosition::Center);
+	sidePanel->add(effectsPanel);
+
+	Label* lblFXTitle = gui->create<Label>();
+	lblFXTitle->bounds().height = 22;
+	lblFXTitle->text("Effects");
+	lblFXTitle->textAlign(Label::Center);
+	effectsPanel->add(lblFXTitle);
+
+	// CHORUS
+	Panel* chorusPanel = gui->create<Panel>();
+	chorusPanel->padding(2);
+	chorusPanel->spacing(2);
+	chorusPanel->setLayout(new StackLayout());
+	chorusPanel->bounds().height = 128;
+	effectsPanel->add(chorusPanel);
+
+	Check* lblChTitle = gui->create<Check>();
+	lblChTitle->bounds().height = 20;
+	lblChTitle->text("Chorus");
+	chorusPanel->add(lblChTitle);
+	lblChTitle->onChecked([&](bool v) {
+		vm->chorusEnabled(v);
+		onChange();
+	});
+
+	Spinner* spnDelay = gui->spinner(
+		&vm->chorusEffect().delay, 10.0f, 50.0f,
+		" Delay", true, onChange
+	);
+	chorusPanel->add(spnDelay);
+
+	Spinner* spnWidth = gui->spinner(
+		&vm->chorusEffect().width, 10.0f, 50.0f,
+		" Width", true, onChange
+	);
+	chorusPanel->add(spnWidth);
+
+	Spinner* spnDepth = gui->spinner(
+		&vm->chorusEffect().depth, 0.0f, 1.0f,
+		" Depth", true, onChange
+	);
+	chorusPanel->add(spnDepth);
+
+	Spinner* spnVoices = gui->spinner(
+		&vm->chorusEffect().numVoices, 2.0f, 5.0f,
+		" Voices", false, onChange, 1.0f
+	);
+	chorusPanel->add(spnVoices);
+
+	Spinner* spnFreq = gui->spinner(
+		&vm->chorusEffect().freq, 0.05f, 2.0f,
+		" Freq.", true, onChange, 0.1f
+	);
+	chorusPanel->add(spnFreq);
+	//
 
 	auto newFileFunc = [&]() {
 		cnv->system()->clear();
@@ -252,6 +325,20 @@ int main(int argc, char** argv) {
 			Json json = util::pack::loadFile(res.value());
 			cnv->load(json);
 			vm->setProgram(cnv->system()->compile());
+
+			// Load Effects...
+			if (json["chorus"].is_object()) {
+				Json chorus = json["chorus"];
+				vm->chorusEnabled(chorus.value("enabled", false));
+				vm->chorusEffect().depth = chorus.value("depth", 0.0f);
+				vm->chorusEffect().width = chorus.value("width", 10.0f);
+				vm->chorusEffect().delay = chorus.value("delay", 10.0f);
+				vm->chorusEffect().freq = chorus.value("freq", 0.2f);
+				vm->chorusEffect().numVoices = chorus.value("numVoices", 2.0f);
+
+				lblChTitle->checked(vm->chorusEnabled());
+			}
+
 			cnv->invalidate();
 			savedFile = res.value();
 			saved = true;
@@ -279,6 +366,23 @@ int main(int argc, char** argv) {
 	});
 	topPanel->add(btOpen);
 
+	auto saveFileFunc = [&](const std::string& fileName) {
+		Json json; cnv->save(json);
+
+		// Save Effects...
+		json["chorus"]["enabled"] = vm->chorusEnabled();
+		json["chorus"]["depth"] = vm->chorusEffect().depth;
+		json["chorus"]["width"] = vm->chorusEffect().width;
+		json["chorus"]["delay"] = vm->chorusEffect().delay;
+		json["chorus"]["freq"] = vm->chorusEffect().freq;
+		json["chorus"]["numVoices"] = vm->chorusEffect().numVoices;
+
+		util::pack::saveFile(fileName, json);
+		saved = true;
+		savedFile = fileName;
+		lblFile->text(savedFile);
+	};
+
 	Button* btSave = gui->create<Button>();
 	btSave->bounds().width = 42;
 	btSave->text("Save");
@@ -290,17 +394,10 @@ int main(int argc, char** argv) {
 				osd::Filters("Synth Program:sprog")
 			);
 			if (res.has_value()) {
-				Json json; cnv->save(json);
-				util::pack::saveFile(res.value(), json);
-				saved = true;
-				savedFile = res.value();
-				lblFile->text(savedFile);
+				saveFileFunc(res.value());
 			}
 		} else {
-			Json json; cnv->save(json);
-			util::pack::saveFile(savedFile, json);
-			saved = true;
-			lblFile->text(savedFile);
+			saveFileFunc(savedFile);
 		}
 	});
 	topPanel->add(btSave);
@@ -365,8 +462,6 @@ int main(int argc, char** argv) {
 
 			u32 row = 0;
 
-			auto onChange = [&]() { saved = false; lblFile->text(savedFile + "*"); };
-
 			Spinner* level = gui->create<Spinner>();
 			level->configure(row++, 0, 4);
 			level->value(nd->level());
@@ -377,6 +472,17 @@ int main(int argc, char** argv) {
 			level->suffix(" Lvl.");
 			level->step(0.01f);
 			options->add(level);
+
+			Spinner* pan = gui->create<Spinner>();
+			pan->configure(row++, 0, 4);
+			pan->value(nd->pan());
+			pan->onChange([&](f32 value) {
+				cnv->current()->pan(value);
+				saved = false;
+			});
+			pan->suffix(" Pan");
+			pan->step(0.01f);
+			options->add(pan);
 
 			switch (nd->type()) {
 				case NodeType::Out: optTitle->text("Node Options (Out)"); break;
@@ -454,7 +560,7 @@ int main(int argc, char** argv) {
 	SDL_AudioDeviceID device;
 	SDL_AudioSpec spec;
 	spec.freq = 44100;
-	spec.samples = 512;
+	spec.samples = 128;
 	spec.channels = 2;
 	spec.callback = callback;
 	spec.userdata = vm.get();

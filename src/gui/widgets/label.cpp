@@ -1,5 +1,7 @@
 #include "label.h"
 
+#include "panel.h"
+
 void Label::onDraw(Renderer& renderer) {
 	i32 tw = renderer.textWidth(m_text) + 1;
 
@@ -19,8 +21,9 @@ void Label::onDraw(Renderer& renderer) {
 
 	renderer.pushClipping(b.x, b.y, b.width, b.height);
 
-	if (m_parent != nullptr) {
-		auto pb = m_parent->realBounds();
+	Panel* parent = getValidParent();
+	if (parent) {
+		auto pb = parent->realBounds();
 		renderer.panel(pb.x, pb.y, pb.width, pb.height);
 	}
 

@@ -5,7 +5,7 @@
 #include "../../engine/node_logic.h"
 
 struct GNode {
-	i32 x{ 0 }, y{ 0 };
+	i32 x{ 0 }, y{ 0 }, height{ 16 };
 	u32 node{ 0 };
 	bool selected{ false };
 };

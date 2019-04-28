@@ -13,6 +13,8 @@ public:
 	bool active() const { return m_active; }
 	void active(bool v) { m_active = v; }
 
+	f32 value() const { return m_phase; }
+
 private:
 	f32 m_phase, m_period;
 	bool m_active{ true };

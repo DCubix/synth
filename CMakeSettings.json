@@ -13,7 +13,8 @@
       "variables": [
         {
           "name": "CMAKE_TOOLCHAIN_FILE",
-          "value": "C:\\Users\\Twister\\Projects\\cpp\\vcpkg\\scripts\\buildsystems\\vcpkg.cmake"
+          "value": "C:\\Users\\Twister\\Projects\\cpp\\vcpkg\\scripts\\buildsystems\\vcpkg.cmake",
+          "type": "STRING"
         }
       ]
     },
@@ -30,9 +31,22 @@
       "variables": [
         {
           "name": "CMAKE_TOOLCHAIN_FILE",
-          "value": "C:\\Users\\Twister\\Projects\\cpp\\vcpkg\\scripts\\buildsystems\\vcpkg.cmake"
+          "value": "C:\\Users\\Twister\\Projects\\cpp\\vcpkg\\scripts\\buildsystems\\vcpkg.cmake",
+          "type": "STRING"
         }
       ]
+    },
+    {
+      "name": "x64-Release-Debug",
+      "generator": "Ninja",
+      "configurationType": "RelWithDebInfo",
+      "buildRoot": "${workspaceRoot}\\build\\${name}",
+      "installRoot": "${env.USERPROFILE}\\CMakeBuilds\\${workspaceHash}\\install\\${name}",
+      "cmakeCommandArgs": "",
+      "buildCommandArgs": "-v",
+      "ctestCommandArgs": "",
+      "inheritEnvironments": [ "msvc_x64_x64" ],
+      "variables": []
     }
   ]
 }

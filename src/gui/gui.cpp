@@ -19,7 +19,8 @@ Spinner* GUI::spinner(
 	f32* value, f32 vmin, f32 vmax,
 	const std::string& suffix,
 	bool drag,
-	const std::function<void()> onChange
+	const std::function<void()> onChange,
+	f32 step
 ) {
 	Spinner* spn = create<Spinner>();
 	spn->m_userData = value;
@@ -27,12 +28,13 @@ Spinner* GUI::spinner(
 	spn->maximum(vmax);
 	spn->draggable(drag);
 	spn->suffix(suffix);
+	spn->step(step);
+	spn->value(*value);
 	spn->onChange([=](f32 val) {
 		f32* _value = spn->userData();
 		(*_value) = val;
 		if (onChange) onChange();
 	});
-	spn->value(*value);
 	return spn;
 }
 

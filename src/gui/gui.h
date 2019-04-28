@@ -27,7 +27,8 @@ public:
 		f32* value, f32 vmin, f32 vmax,
 		const std::string& suffix = "", 
 		bool drag = true,
-		const std::function<void()> onChange = nullptr
+		const std::function<void()> onChange = nullptr,
+		f32 step = 0.1f
 	);
 
 	void destroy(Widget* widget);

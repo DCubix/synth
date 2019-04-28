@@ -9,15 +9,17 @@ endif()
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
-set(CMAKE_CXX_EXTENSIONS OFF)
+set(CMAKE_CXX_EXTENSIONS ON)
+
+if (MSVC)
+	set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /fp:fast")
+else()
+	set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -ffast-math")
+endif()
 
 file(GLOB_RECURSE SRC "src/*.h" "src/*.hpp" "src/*.cpp" "src/*.c")
 
-if (MINGW)
-	find_package(SDL2 REQUIRED SDL2)
-else()
-	find_package(SDL2 CONFIG REQUIRED)
-endif()
+find_package(SDL2 CONFIG REQUIRED)
 find_package(SDL2_gfx REQUIRED STATIC)
 
 set(BUILD_SHARED_LIBS CACHE BOOL OFF)
@@ -27,9 +29,20 @@ add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/sndfilter)
 add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/osdialog)
 
 add_executable(${PROJECT_NAME} ${SRC})
-target_link_libraries(${PROJECT_NAME}
-	PRIVATE
-	SDL2::SDL2 SDL2::SDL2main
-	${SDL2_GFX_LIBRARIES}
-	rtmidi sndfilter osdialog
-)
+
+if (MINGW)
+	message("SDL2: " ${SDL2_LIBRARIES})
+	target_link_libraries(${PROJECT_NAME}
+		PRIVATE
+		${SDL2_LIBRARIES}
+		${SDL2_GFX_LIBRARIES}
+		rtmidi sndfilter osdialog stdc++fs
+	)
+else()
+	target_link_libraries(${PROJECT_NAME}
+		PRIVATE
+		SDL2::SDL2 SDL2::SDL2main
+		${SDL2_GFX_LIBRARIES}
+		rtmidi sndfilter osdialog
+	)
+endif()

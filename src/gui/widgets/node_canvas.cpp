@@ -7,8 +7,8 @@
 #include "../../engine/remap.hpp"
 
 constexpr u32 NodeWidth = 68;
-constexpr u32 NodeHeight = 54;
 constexpr u32 textPad = 3;
+constexpr u32 GridSize = 8;
 
 NodeCanvas::NodeCanvas() {
 	m_system = std::make_unique<NodeSystem>();
@@ -18,15 +18,25 @@ NodeCanvas::NodeCanvas() {
 }
 
 static u32 inY(u32 index) {
-	return (10 * index) + (NodeHeight / 4) + 3;
+	return (10 * index) + 17;
 }
 
 void NodeCanvas::onDraw(Renderer& renderer) {
 	auto b = realBounds();
 	renderer.panel(b.x, b.y, b.width, b.height);
-	renderer.rect(b.x, b.y, b.width, b.height, 0, 0, 0, 70, true);
-
 	renderer.pushClipping(b.x + 1, b.y + 1, b.width - 2, b.height - 2);
+	
+	// Grid
+	for (u32 y = b.y; y < b.y + b.height; y += GridSize) {
+		renderer.line(b.x, y, b.x + b.width, y, 196, 212, 209, 80);
+	}
+	for (u32 x = b.x; x < b.x + b.width; x += GridSize) {
+		renderer.line(x, b.y, x, b.y + b.height, 196, 212, 209, 80);
+	}
+	renderer.rect(b.x, b.y, b.width, b.height, 196, 212, 209, 80);
+	//
+
+	renderer.rect(b.x, b.y, b.width, b.height, 0, 0, 0, 80, true);
 
 	auto nodes = m_system->nodes();
 	std::sort(nodes.begin(), nodes.end(), [&](u32 a, u32 b) {
@@ -34,7 +44,14 @@ void NodeCanvas::onDraw(Renderer& renderer) {
 	});
 
 	m_gnodes[0].x = b.width - 12;
-	m_gnodes[0].y = b.height / 2 - NodeHeight / 2;
+	m_gnodes[0].y = b.height / 2 - m_gnodes[0].height / 2;
+
+	for (u32 nid : nodes) {
+		GNode& gnode = m_gnodes[nid];
+		Node* node = m_system->get<Node>(nid);
+		u32 count = node->paramCount() == 0 ? 1 : node->paramCount();
+		gnode.height = 20 + (count * 10);
+	}
 
 	// Draw connections
 	for (u32 cid : m_system->connections()) {
@@ -81,24 +98,30 @@ void NodeCanvas::onDraw(Renderer& renderer) {
 			const i32 nw = std::abs(connDestX - connSrcX) + w - 1;
 			renderer.roundRect(
 				connDestX - w / 2, connDestY,
-				nw,	NodeHeight - 16, rad,
+				nw, dest.height - 16, rad,
 				196, 212, 209
 			);
 			i32 mx = (connDestX + connSrcX) / 2;
-			i32 my = connDestY + NodeHeight - 16;
+			i32 my = connDestY + dest.height - 16;
 			renderer.roundRect(mx - 3, my - 3, 6, 6, 6, 196, 212, 209);
 		}
 	}
 
 	for (u32 nid : nodes) {
-		GNode gnode = m_gnodes[nid];
+		GNode& gnode = m_gnodes[nid];
 		Node* node = m_system->get<Node>(nid);
 		i32 nx = gnode.x + b.x;
 		i32 ny = gnode.y + b.y;
 
+		i32 ngx = ::floor(gnode.x / GridSize) * GridSize + b.x;
+		i32 ngy = ::floor(gnode.y / GridSize) * GridSize + b.y;
+
 		if (node->type() != NodeType::Out) {
-			renderer.flatPanel(nx, ny, NodeWidth, NodeHeight, 0, 3, 0.8f);
-			renderer.pushClipping(nx + 1, ny + 1, NodeWidth - 2, NodeHeight - 2);
+			if (gnode.selected && m_state == Moving) {
+				renderer.rect(ngx, ngy, NodeWidth, gnode.height, 255, 255, 255, 50, true);
+			}
+			renderer.flatPanel(nx, ny, NodeWidth, gnode.height, 0, 3, 0.8f);
+			renderer.pushClipping(nx + 1, ny + 1, NodeWidth - 2, gnode.height - 2);
 			renderer.rect(nx + 1, ny + 1, NodeWidth - 2, 16, 0, 0, 0, 80, true);
 
 			std::string txt = "";
@@ -111,6 +134,7 @@ void NodeCanvas::onDraw(Renderer& renderer) {
 				case NodeType::Map: txt = "Map"; break;
 				case NodeType::Reader: txt = "Reader"; break;
 				case NodeType::Writer: txt = "Writer"; break;
+				case NodeType::Mul: txt = "Mul"; break;
 			}
 			renderer.text(nx + 5, ny + 5, txt, 0, 0, 0, 128);
 			renderer.text(nx + 4, ny + 4, txt, 255, 255, 255, 180);
@@ -126,12 +150,12 @@ void NodeCanvas::onDraw(Renderer& renderer) {
 			renderer.textSmall(nx + NodeWidth - (textPad + 8), py + textPad, "\x9", 0, 0, 0, 200);
 
 			if (gnode.selected) {
-				renderer.rect(nx + 2, ny + 2, NodeWidth - 4, NodeHeight - 4, 255, 255, 255, 50, true);
+				renderer.rect(nx + 2, ny + 2, NodeWidth - 4, gnode.height - 4, 255, 255, 255, 50, true);
 			}
 
 			//renderer.textSmall(nx + 4, py + 4, std::to_string(node->level()), 255, 0, 0, 255);
 		} else {
-			renderer.flatPanel(nx, ny, NodeWidth, NodeHeight, 0, 2, 0.2f);
+			renderer.flatPanel(nx, ny, NodeWidth, gnode.height, 0, 2, 0.2f);
 			i32 py = inY(0) + ny;
 			renderer.textSmall(nx + textPad, py + textPad, "\x9", 0, 0, 0, 200);
 		}
@@ -229,7 +253,7 @@ void NodeCanvas::onPress(u8 button, i32 x, i32 y) {
 				m_link.active = true;
 				clickConnector = true;
 				break;
-			} else if (util::hits(x, y, nx, ny, NodeWidth, NodeHeight)) {
+			} else if (util::hits(x, y, nx, ny, NodeWidth, gnode.height)) {
 				if (!m_multiSelect) {
 					for (auto&& nid : m_selected) {
 						m_gnodes[nid].selected = false;
@@ -274,7 +298,7 @@ void NodeCanvas::onPress(u8 button, i32 x, i32 y) {
 						my = (connDestY + connSrcY) / 2;
 					} else {
 						mx = (connDestX + connSrcX) / 2;
-						my = connDestY + NodeHeight - 16;
+						my = connDestY + src.height - 16;
 					}
 
 					if (util::hits(x, y, mx - 5, my - 5, 10, 10)) {
@@ -298,6 +322,12 @@ void NodeCanvas::onPress(u8 button, i32 x, i32 y) {
 }
 
 void NodeCanvas::onRelease(u8 button, i32 x, i32 y) {
+	for (auto&& nid : m_selected) {
+		GNode& gn = m_gnodes[nid];
+		gn.x = ::floor(gn.x / GridSize) * GridSize;
+		gn.y = ::floor(gn.y / GridSize) * GridSize;
+	}
+
 	for (u32 nid : m_system->nodes()) {
 		GNode& gnode = m_gnodes[nid];
 		Node* node = m_system->get<Node>(nid);
@@ -361,6 +391,8 @@ void NodeCanvas::load(Json json) {
 			id = m_system->create<Map>();
 		} else if (type == "value") {
 			id = m_system->create<Value>();
+		} else if (type == "mul") {
+			id = m_system->create<Mul>();
 		} else continue;
 
 		GNode& gnd = m_gnodes[id];
@@ -398,6 +430,7 @@ void NodeCanvas::save(Json& json) {
 			case NodeType::ADSR: txt = "adsr"; break;
 			case NodeType::Map: txt = "map"; break;
 			case NodeType::Value: txt = "value"; break;
+			case NodeType::Mul: txt = "mul"; break;
 		}
 		nodeJson["type"] = txt;
 

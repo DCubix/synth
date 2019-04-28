@@ -6,10 +6,11 @@
 
 bool Element::hits(i32 x, i32 y) {
 	auto b = realBounds();
+	bool parentHits = m_parent ? m_parent->hits(x, y) : true;
 	return x > b.x &&
 		x < b.x + b.width &&
 		y > b.y &&
-		y < b.y + b.height;
+		y < b.y + b.height && parentHits;
 }
 
 void EventHandler::subscribe(Element* element) {

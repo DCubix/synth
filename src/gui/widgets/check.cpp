@@ -1,9 +1,10 @@
 #include "check.h"
 
 void Check::onClick(u8 button, i32 x, i32 y) {
-	Widget::onClick(button, x, y);
 	m_checked = !m_checked;
+	if (m_onChecked) m_onChecked(m_checked);
 	invalidate();
+	Widget::onClick(button, x, y);
 }
 
 void Check::onDraw(Renderer& renderer) {

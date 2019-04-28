@@ -5,6 +5,7 @@
 #include "../renderer.h"
 
 class GUI;
+class Panel;
 class Widget : public Element {
 	friend class GUI;
 	friend class Panel;
@@ -32,6 +33,8 @@ public:
 	u32 layoutParam() const { return m_layoutParam; }
 	void layoutParam(u32 v) { m_layoutParam = v; invalidate(); }
 
+	Panel* getValidParent();
+
 protected:
 	GUI* m_gui;
 	u32 m_layoutParam{ 0 };
@@ -43,6 +46,8 @@ protected:
 		m_gridColumn{ 0 },
 		m_rowSpan{ 1 },
 		m_columnSpan{ 1 };
+
+	Panel* getValidParentRecursive(Widget* parent);
 };
 
 #endif // SYG_WIDGET_H

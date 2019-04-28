@@ -8,7 +8,11 @@
 #include "font_small.h"
 #include "stb_image.h"
 
-#include "SDL2_gfxPrimitives.h"
+#if __has_include("SDL2_gfxPrimitives.h")
+#	include "SDL2_gfxPrimitives.h"
+#else
+#	include "SDL2/SDL2_gfxPrimitives.h"
+#endif
 
 #define MAX_SHADOW 32.0f
 
@@ -105,10 +109,8 @@ void Renderer::arc(i32 x, i32 y, i32 rad, i32 start, i32 end, u8 r, u8 g, u8 b, 
 }
 
 void Renderer::rect(i32 x, i32 y, i32 w, i32 h, u8 r, u8 g, u8 b, u8 a, bool fill) {
-	SDL_SetRenderDrawColor(m_ren, r, g, b, a);
-	SDL_Rect rec = { x, y, w, h };
-	if (fill) SDL_RenderFillRect(m_ren, &rec);
-	else      SDL_RenderDrawRect(m_ren, &rec);
+	if (fill) boxRGBA(m_ren, x, y, x + w, y + h - 1, r, g, b, a);
+	else      rectangleRGBA(m_ren, x, y, x + w, y + h - 1, r, g, b, a);
 }
 
 void Renderer::triangle(i32 x1, i32 y1, i32 x2, i32 y2, i32 x3, i32 y3, u8 r, u8 g, u8 b, u8 a) {

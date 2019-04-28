@@ -14,6 +14,7 @@
 #include "../common.h"
 #include "phase.h"
 #include "adsr.h"
+#include "chorus.h"
 #include "../log/log.h"
 
 extern "C" {
@@ -25,7 +26,13 @@ constexpr u32 SynMaxConnections = 512;
 constexpr u32 SynMaxVoices = 16;
 constexpr u32 OutputNode = 0;
 
-using Sample = std::pair<f32, f32>;
+struct Sample {
+	f32 L{ 0.0f }, R{ 0.0f };
+
+	Sample() = default;
+	Sample(f32 v) : L(v), R(v) {}
+	Sample(f32 l, f32 r) : L(l), R(r) {}
+};
 
 enum OpCode {
 	OpPush = 0,
@@ -38,7 +45,8 @@ enum OpCode {
 	OpWrite,
 	OpRead,
 	OpNodeID,
-	OpValue
+	OpValue,
+	OpMul
 };
 
 struct Instruction {
@@ -65,6 +73,7 @@ public:
 	inline ProgramBuilder& read(u32 id) { m_program.push_back({ OpRead, 0, nullptr, id }); return *this; }
 	inline ProgramBuilder& write(u32 id) { m_program.push_back({ OpWrite, 0, nullptr, id }); return *this; }
 	inline ProgramBuilder& value(u32 id, f32 value) { m_program.push_back({ OpValue, value, nullptr, id }); return *this; }
+	inline ProgramBuilder& mul(u32 id) { m_program.push_back({ OpMul, 0.0f, nullptr, id }); return *this; }
 
 	Program build() const { return m_program; }
 
@@ -77,7 +86,7 @@ public:
 	SynthVM();
 
 	void load(const Program& program);
-	Sample execute(f32 sampleRate);
+	f32 execute(f32 sampleRate, u32 channel = 0);
 
 	f32 frequency() const { return m_frequency; }
 	void frequency(f32 v) { m_frequency = v; }
@@ -93,12 +102,14 @@ private:
 	util::Stack<f32, 512> m_stack;
 
 	Program m_program;
-	Sample m_out{ 0.0f, 0.0f };
+	f32 m_out{ 0.0f };
 
 	std::array<Phase, 128> m_phases;
 	std::array<ADSR, 128> m_envs;
 	std::array<f32, SynMaxNodes> m_storage;
 	u32 m_usedEnvs{ 0 };
+
+	ADSR* m_longestEnv{ nullptr };
 
 	std::mutex m_lock;
 };
@@ -135,6 +146,11 @@ public:
 
 	f32 sampleRate() const { return m_sampleRate; }
 
+	Chorus& chorusEffect() { return m_chorus; }
+
+	bool chorusEnabled() const { return m_chorusEnabled; }
+	void chorusEnabled(bool v) { m_chorusEnabled = v; }
+
 private:
 	std::array< std::unique_ptr<Voice>, SynMaxVoices> m_voices;
 	Voice* findFreeVoice();
@@ -143,6 +159,8 @@ private:
 	f32 m_sampleRate{ 44100.0f };
 
 	sf_compressor_state_st m_compressor;
+	Chorus m_chorus;
+	bool m_chorusEnabled{ false };
 };
 
 enum class NodeType {
@@ -154,7 +172,8 @@ enum class NodeType {
 	ADSR,
 	Map,
 	Writer,
-	Reader
+	Reader,
+	Mul
 };
 
 class NodeSystem;
@@ -170,13 +189,14 @@ public:
 	~Node() = default;
 
 	virtual NodeType type() { return NodeType::None; }
-	virtual void load(Json json) { m_level = json.value("level", 1.0f); }
-	virtual void save(Json& json) { json["level"] = m_level; }
+	virtual void load(Json json);
+	virtual void save(Json& json);
 
 	float& level() { return m_level; }
-	void level(f32 v) {
-		m_level = v;
-	}
+	void level(f32 v) { m_level = v; }
+
+	float& pan() { return m_pan; }
+	void pan(f32 v) { m_pan = v; }
 
 	u32 id() const { return m_id; }
 
@@ -187,7 +207,7 @@ public:
 	u32 paramCount() const { return m_params.size(); }
 
 protected:
-	f32 m_level{ 1.0f };
+	f32 m_level{ 1.0f }, m_pan{ 0.5f };
 	u32 m_id{ 0 };
 
 	std::vector<Param> m_params;
@@ -198,14 +218,7 @@ using NodePtr = std::unique_ptr<Node>;
 class Output : public Node {
 public:
 	Output();
-
 	virtual NodeType type() override { return NodeType::Out; }
-
-	float pan() { return param(1).value; }
-	void pan(f32 v) { param(1).value = v; }
-
-	virtual void load(Json json) override;
-	virtual void save(Json& json) override;
 };
 
 class Value : public Node {
@@ -216,6 +229,12 @@ public:
 	virtual void save(Json& json) override;
 
 	f32 value{ 0.0f };
+};
+
+class Mul : public Node {
+public:
+	Mul();
+	virtual NodeType type() override { return NodeType::Mul; }
 };
 
 class NodeSystem {

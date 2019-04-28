@@ -9,6 +9,18 @@
 #include "remap.hpp"
 #include "storage.hpp"
 
+#include "chorus.h"
+
+void Node::load(Json json) {
+	m_level = json.value("level", 1.0f);
+	m_pan = json.value("pan", 0.5f);
+}
+
+void Node::save(Json& json) {
+	json["level"] = m_level;
+	json["pan"] = m_pan;
+}
+
 void Node::addParam(const std::string& name) {
 	m_paramNames.push_back(name);
 	m_params.push_back(Param{});
@@ -210,6 +222,7 @@ static void process(NodeSystem* sys, Node* node, Node* prev, ProgramBuilder& out
 		}
 	}
 	out.pushp(id, &node->level());
+	out.pushp(id, &node->pan());
 	switch (type) {
 		case NodeType::LFO: out.lfo(id); break;
 		case NodeType::SineWave: out.sine(id); break;
@@ -219,6 +232,7 @@ static void process(NodeSystem* sys, Node* node, Node* prev, ProgramBuilder& out
 		case NodeType::Reader: out.read(id); break;
 		case NodeType::Writer: out.write(id); break;
 		case NodeType::Value: out.value(id, ((Value*)node)->value); break;
+		case NodeType::Mul: out.mul(id); break;
 		default: break;
 	}
 }
@@ -231,18 +245,6 @@ Program NodeSystem::compile() {
 
 Output::Output() {
 	addParam("Out");
-	addParam("Pan");
-	param(1).value = 0.5f;
-}
-
-void Output::load(Json json) {
-	Node::load(json);
-	pan(json.value("pan", 0.5f));
-}
-
-void Output::save(Json& json) {
-	Node::save(json);
-	json["pan"] = pan();
 }
 
 SynthVM::SynthVM() {
@@ -252,72 +254,74 @@ SynthVM::SynthVM() {
 void SynthVM::load(const Program& program) {
 	m_lock.lock();
 	m_program = program;
-	m_storage.fill(0.0f);
-	m_stack.clear();
 	m_lock.unlock();
 }
 
-Sample SynthVM::execute(f32 sampleRate) {
+f32 SynthVM::execute(f32 sampleRate, u32 channel) {
 #define PUSH(x) if (m_stack.canPush()) m_stack.push((x))
 #define POP(x) if (!m_stack.empty()) { x = m_stack.top(); m_stack.pop(); }
 #define POPA(x) if (!m_stack.empty()) { x += m_stack.top(); m_stack.pop(); }
+#define PAN (channel == 0 ? 1.0f - pan : pan)
 	
-	u32 i = 0, e = 0 /*Env*/;
+	u32 i = 0 /* Phase */, e = 0 /* Env */;
+	u32 pc = 0;
 	f32 result = 0.0f;
-	for (auto&& ins : m_program) {
+	f32 level = 1.0f, pan = 0.5f;
+
+	while (pc < m_program.size()) {
+		Instruction& ins = m_program[pc++];
 		result = m_storage[ins.nodeID];
 		switch (ins.opcode) {
 			case OpPush: PUSH(ins.param); break;
 			case OpPushPtr: PUSH(*ins.paramPtr); break;
 			case OpOut: {
-				f32 val = 0.0f;
-				f32 level = 1.0f;
-				f32 pan = 0.5f;
-				POP(level);
 				POP(pan);
+				POP(level);
+				f32 val = 0.0f;
 
 				// mix all the inputs
 				while (!m_stack.empty()) {
 					POPA(val);
 				}
-				result = val * level;
-				m_out = { result * (1.0f - pan), result * pan };
+				result = val * level * PAN;
+				m_out = result;
 			} break;
 			case OpSine: {
 				f32 freqMod = 0.0f;
 				f32 offset = 0.0f;
-				f32 lvl = 1.0f;
 				f32 lvlm = 1.0f;
-				POP(lvl);
+				POP(pan);
+				POP(level);
 				POP(lvlm);
 				POP(offset);
 				while (!m_stack.empty()) {
 					POPA(freqMod);
 				}
 				f32 freqVal = m_phases[i++].advance(m_frequency + offset, sampleRate) + freqMod;
-				f32 s = ::sinf(freqVal);
-				result = s * lvl * lvlm;
+				f32 s = ::cosf(freqVal);
+				result = s * level * lvlm * PAN;
 				PUSH(result);
 			} break;
 			case OpLFO: {
 				f32 freq = 0.0f;
 				f32 vmin = 0.0f;
 				f32 vmax = 0.0f;
-				f32 lvl = 1.0f, lvlm = 1.0f;
-				POP(lvl);
+				f32 lvlm = 1.0f;
+				POP(pan);
+				POP(level);
 				POP(lvlm);
 				POP(freq);
 				POP(vmax);
 				POP(vmin);
 				f32 freqVal = m_phases[i++].advance(freq, sampleRate);
 				f32 s = vmin + (::sinf(freqVal) * 0.5f + 0.5f) * (vmax - vmin);
-				result = s * lvl * lvlm;
+				result = s * level * lvlm;
 				PUSH(result);
 			} break;
 			case OpADSR: {
-				f32 lvl = 1.0f;
 				f32 a = 0.0f, d = 0.0f, s = 1.0f, r = 0.0f;
-				POP(lvl);
+				POP(pan);
+				POP(level);
 				POP(r);
 				POP(s);
 				POP(d);
@@ -327,13 +331,14 @@ Sample SynthVM::execute(f32 sampleRate) {
 				env.decay(d * sampleRate);
 				env.sustain(s);
 				env.release(r * sampleRate);
-				result = env.sample() * lvl;
+				result = env.sample() * level;
 				PUSH(result);
 			} break;
 			case OpMap: {
-				f32 lvl = 1.0f, in = 0.0f;
+				f32 in = 0.0f;
 				f32 fmi = 0.0f, fma = 1.0f, tmi = 0.0f, tma = 1.0f;
-				POP(lvl);
+				POP(pan);
+				POP(level);
 				POP(in);
 				POP(tma);
 				POP(tmi);
@@ -344,55 +349,66 @@ Sample SynthVM::execute(f32 sampleRate) {
 				PUSH(result);
 			} break;
 			case OpWrite: {
-				f32 lvl = 1.0f, chan = 0.0f, in = 0.0f;
-				POP(lvl);
+				f32 chan = 0.0f, in = 0.0f;
+				POP(pan);
+				POP(level);
 				POP(in);
 				POP(chan);
-				m_storage[u32(chan) % m_storage.size()] = in * lvl;
+				m_storage[u32(chan) % m_storage.size()] = in * level;
 				result = m_storage[u32(chan) % m_storage.size()];
 				PUSH(result);
 			} break;
 			case OpRead: {
-				f32 lvl = 1.0f, chan = 0.0f;
-				POP(lvl);
+				f32 chan = 0.0f;
+				POP(pan);
+				POP(level);
 				POP(chan);
-				result = m_storage[u32(chan) % m_storage.size()] * lvl;
+				result = m_storage[u32(chan) % m_storage.size()] * level;
 				PUSH(result);
 			} break;
 			case OpValue: {
-				f32 lvl = 1.0f;
 				f32 val = 0.0f;
-				POP(lvl);
+				POP(pan);
+				POP(level);
 				POP(val);
-				PUSH(val * lvl);
+				result = val * level;
+				PUSH(result);
+			} break;
+			case OpMul: {
+				f32 a = 0.0f, b = 0.0f;
+				POP(pan);
+				POP(level);
+				POP(b);
+				POP(a);
+				result = (a * b) * level;
+				PUSH(result);
 			} break;
 		}
 		// Write result to storage
 		m_storage[ins.nodeID] = result;
 	}
 	m_usedEnvs = e;
+
+	if (e > 0) {
+		f32 time = -1.0f;
+		m_longestEnv = nullptr;
+		for (u32 i = 0; i < e; i++) {
+			if (m_envs[i].totalTime() > time) {
+				time = m_envs[i].totalTime();
+				m_longestEnv = &m_envs[i];
+			}
+		}
+	}
+
 	return m_out;
 }
 
 ADSR* SynthVM::getLongestEnvelope() {
-	f32 time = -1.0f;
-	ADSR* env = nullptr;
-	for (auto&& aenv : m_envs) {
-		if (aenv.totalTime() > time) {
-			env = &aenv;
-			time = aenv.totalTime();
-		}
-	}
-	return env;
+	return m_longestEnv;
 }
 
 Voice::Voice() {
 	m_vm = std::make_unique<SynthVM>();
-	/*for (auto&& adsr : m_vm->envelopes()) {
-		adsr.setOnFinish([&]() {
-			free();
-		});
-	}*/
 }
 
 void Voice::setNote(u32 note) {
@@ -402,10 +418,11 @@ void Voice::setNote(u32 note) {
 
 Sample Voice::sample(f32 sampleRate) {
 	if (!m_active) return { 0.0f, 0.0f };
-	auto s = m_vm->execute(sampleRate);
+	f32 L = m_vm->execute(sampleRate, 0);
+	f32 R = m_vm->execute(sampleRate, 1);
 	return {
-		s.first * m_velocity,
-		s.second * m_velocity
+		L * m_velocity,
+		R * m_velocity
 	};
 }
 
@@ -448,18 +465,25 @@ Sample Synth::sample() {
 		Voice& voice = *m_voices[i].get();
 		auto s = voice.sample(m_sampleRate);
 
-		if (!voice.vm().getLongestEnvelope()->active) voice.free();
+		auto env = voice.vm().getLongestEnvelope();
+		if (env && !env->active) voice.free();
 
-		out.first += s.first;
-		out.second += s.second;
+		out.L += s.L;
+		out.R += s.R;
+	}
+
+	// Chorus
+	if (m_chorusEnabled) {
+		out.L = m_chorus.process(out.L, m_sampleRate, 0);
+		out.R = m_chorus.process(out.R, m_sampleRate, 1);
 	}
 
 	// Compressor
 	sf_sample_st sin, sout;
-	sin.L = out.first;
-	sin.R = out.second;
-	sout.L = out.first;
-	sout.R = out.second;
+	sin.L = out.L;
+	sin.R = out.R;
+	sout.L = out.L;
+	sout.R = out.R;
 	sf_compressor_process(&m_compressor, 1, &sin, &sout);
 
 	return { sout.L, sout.R };
@@ -485,4 +509,9 @@ void Value::load(Json json) {
 void Value::save(Json& json) {
 	Node::save(json);
 	json["value"] = value;
+}
+
+Mul::Mul() {
+	addParam("A");
+	addParam("B");
 }
