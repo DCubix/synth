@@ -1,6 +1,6 @@
 #include "check.h"
 
-void Check::onClick(u8 button, i32 x, i32 y) {
+void Check::onClick(int button, int x, int y) {
 	m_checked = !m_checked;
 	if (m_onChecked) m_onChecked(m_checked);
 	invalidate();

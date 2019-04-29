@@ -19,8 +19,8 @@
 #include "gui/widgets/check.h"
 #include "gui/widgets/label.h"
 #include "gui/widgets/panel.h"
-#include "gui/widgets/node_canvas.h"
 #include "gui/widgets/keyboard.h"
+#include "node_canvas.h"
 
 #include "../rtmidi/RtMidi.h"
 #include "../osdialog/OsDialog.hpp"

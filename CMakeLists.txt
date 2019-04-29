@@ -1,8 +1,6 @@
 cmake_minimum_required(VERSION 3.10)
 project(synth LANGUAGES C CXX VERSION 1.0)
 
-set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_SOURCE_DIR}/cmake/")
-
 if(WIN32 OR MINGW)
 	add_definitions(-DSDL_MAIN_HANDLED)
 endif()
@@ -17,16 +15,31 @@ else()
 	set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -ffast-math")
 endif()
 
-file(GLOB_RECURSE SRC "src/*.h" "src/*.hpp" "src/*.cpp" "src/*.c")
+file(GLOB SRC 
+	"src/engine/*.h"
+	"src/engine/*.hpp"
+	"src/engine/*.cpp"
+	"src/engine/*.c"
+
+	"src/log/*.h"
+	"src/log/*.hpp"
+	"src/log/*.cpp"
+	"src/log/*.c"
+
+	"src/*.h"
+	"src/*.hpp"
+	"src/*.cpp"
+	"src/*.c"
+)
 
 find_package(SDL2 CONFIG REQUIRED)
-find_package(SDL2_gfx REQUIRED STATIC)
 
 set(BUILD_SHARED_LIBS CACHE BOOL OFF)
 set(BUILD_TESTING CACHE BOOL OFF)
 add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/rtmidi)
 add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/sndfilter)
 add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/osdialog)
+add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/src/gui)
 
 add_executable(${PROJECT_NAME} ${SRC})
 
@@ -35,14 +48,14 @@ if (MINGW)
 	target_link_libraries(${PROJECT_NAME}
 		PRIVATE
 		${SDL2_LIBRARIES}
-		${SDL2_GFX_LIBRARIES}
+		gui
 		rtmidi sndfilter osdialog stdc++fs
 	)
 else()
 	target_link_libraries(${PROJECT_NAME}
 		PRIVATE
 		SDL2::SDL2 SDL2::SDL2main
-		${SDL2_GFX_LIBRARIES}
+		gui
 		rtmidi sndfilter osdialog
 	)
 endif()

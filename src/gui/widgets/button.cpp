@@ -9,7 +9,7 @@ void Button::onDraw(Renderer& renderer) {
 	if (!enabled()) m_state = State::Disabled;
 
 	auto b = realBounds();
-	renderer.button(b.x, b.y, b.width, b.height, u32(m_state));
+	renderer.button(b.x, b.y, b.width, b.height, int(m_state));
 
 	renderer.pushClipping(b.x, b.y, b.width, b.height);
 	renderer.text(
@@ -25,14 +25,14 @@ void Button::onDraw(Renderer& renderer) {
 	renderer.popClipping();
 }
 
-void Button::onPress(u8 button, i32 x, i32 y) {
+void Button::onPress(int button, int x, int y) {
 	Widget::onPress(button, x, y);
 
 	m_state = State::Click;
 	invalidate();
 }
 
-void Button::onRelease(u8 button, i32 x, i32 y) {
+void Button::onRelease(int button, int x, int y) {
 	Widget::onRelease(button, x, y);
 
 	m_state = State::Normal;

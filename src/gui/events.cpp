@@ -2,9 +2,7 @@
 
 #include <algorithm>
 
-#include "../log/log.h"
-
-bool Element::hits(i32 x, i32 y) {
+bool Element::hits(int x, int y) {
 	auto b = realBounds();
 	bool parentHits = m_parent ? m_parent->hits(x, y) : true;
 	return x > b.x &&
@@ -41,8 +39,8 @@ EventHandler::Status EventHandler::poll() {
 		switch (m_event.type) {
 			case SDL_QUIT: status = Quit; break;
 			case SDL_MOUSEBUTTONDOWN: {
-				i32 x = m_event.button.x;
-				i32 y = m_event.button.y;
+				int x = m_event.button.x;
+				int y = m_event.button.y;
 
 				bool cont = false;
 				for (Element* el : m_elements) {
@@ -80,8 +78,8 @@ EventHandler::Status EventHandler::poll() {
 				}
 			} break;
 			case SDL_MOUSEBUTTONUP: {
-				i32 x = m_event.button.x;
-				i32 y = m_event.button.y;
+				int x = m_event.button.x;
+				int y = m_event.button.y;
 
 				bool cont = false;
 				for (Element* el : m_elements) {
@@ -105,8 +103,8 @@ EventHandler::Status EventHandler::poll() {
 				}
 			} break;
 			case SDL_MOUSEMOTION: {
-				i32 x = m_event.motion.x;
-				i32 y = m_event.motion.y;
+				int x = m_event.motion.x;
+				int y = m_event.motion.y;
 
 				for (Element* el : m_elements) {
 					if (!el->hits(x, y)) {

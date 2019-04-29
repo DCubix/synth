@@ -6,7 +6,7 @@
 class Check : public Widget {
 public:
 
-	virtual void onClick(u8 button, i32 x, i32 y) override;
+	virtual void onClick(int button, int x, int y) override;
 	virtual void onDraw(Renderer& renderer) override;
 
 	std::string text() const { return m_text; }

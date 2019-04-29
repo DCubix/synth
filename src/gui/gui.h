@@ -3,7 +3,6 @@
 
 #include <memory>
 
-#include "../sdl2.h"
 #include "events.h"
 #include "renderer.h"
 
@@ -24,11 +23,11 @@ public:
 	}
 
 	Spinner* spinner(
-		f32* value, f32 vmin, f32 vmax,
+		float* value, float vmin, float vmax,
 		const std::string& suffix = "", 
 		bool drag = true,
 		const std::function<void()> onChange = nullptr,
-		f32 step = 0.1f
+		float step = 0.1f
 	);
 
 	void destroy(Widget* widget);
@@ -38,7 +37,7 @@ public:
 
 	Panel* root() { return m_root; }
 
-	void render(i32 width, i32 height);
+	void render(int width, int height);
 	void clear() { m_clear = true; }
 
 private:

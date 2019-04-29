@@ -15,8 +15,8 @@ public:
 	Button();
 
 	virtual void onDraw(Renderer& renderer) override;
-	virtual void onPress(u8 button, i32 x, i32 y) override;
-	virtual void onRelease(u8 button, i32 x, i32 y) override;
+	virtual void onPress(int button, int x, int y) override;
+	virtual void onRelease(int button, int x, int y) override;
 	virtual void onEnter() override;
 	virtual void onExit() override;
 

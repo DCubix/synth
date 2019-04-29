@@ -1,7 +1,6 @@
 #ifndef SYG_LAYOUT_H
 #define SYG_LAYOUT_H
 
-#include "../common.h"
 #include <vector>
 #include <array>
 
@@ -27,7 +26,7 @@ public:
     virtual void apply(Panel* panel, std::vector<Widget*> widgets) override;
 private:
     std::array<Widget*, MaxPosition> slots;
-    u32 m_slotCount{ 0 };
+    int m_slotCount{ 0 };
 };
 
 class GridLayout : public Layout {

@@ -2,7 +2,7 @@
 
 #include "panel.h"
 
-void Widget::configure(u32 row, u32 col, u32 colSpan, u32 rowSpan) {
+void Widget::configure(int row, int col, int colSpan, int rowSpan) {
 	m_gridRow = row;
 	m_gridColumn = col;
 	m_columnSpan = colSpan;

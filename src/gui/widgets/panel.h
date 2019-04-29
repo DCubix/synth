@@ -15,17 +15,17 @@ public:
 	void add(Widget* widget);
 	void remove(Widget* widget);
 
-	u32 gridWidth() const { return m_gridWidth; }
-	void gridWidth(u32 v) { m_gridWidth = v; }
+	int gridWidth() const { return m_gridWidth; }
+	void gridWidth(int v) { m_gridWidth = v; }
 
-	u32 gridHeight() const { return m_gridHeight; }
-	void gridHeight(u32 v) { m_gridHeight = v; }
+	int gridHeight() const { return m_gridHeight; }
+	void gridHeight(int v) { m_gridHeight = v; }
 
-	u32 padding() const { return m_padding; }
-	void padding(u32 v) { m_padding = v; }
+	int padding() const { return m_padding; }
+	void padding(int v) { m_padding = v; }
 
-	u32 spacing() const { return m_spacing; }
-	void spacing(u32 v) { m_spacing = v; }
+	int spacing() const { return m_spacing; }
+	void spacing(int v) { m_spacing = v; }
 
 	bool drawBackground() const { return m_drawBackground; }
 	void drawBackground(bool v) { m_drawBackground = v; }
@@ -38,7 +38,7 @@ public:
 private:
 	std::unique_ptr<Layout> m_layout;
 	std::vector<Widget*> m_children;
-	u32 m_gridWidth{ 2 }, // # of columns
+	int m_gridWidth{ 2 }, // # of columns
 		m_gridHeight{ 2 }, // # of rows
 		m_padding{ 5 }, // Spacing around the edges
 		m_spacing{ 4 }; // Spacing between grid cells

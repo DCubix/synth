@@ -9,31 +9,31 @@ public:
 	Spinner();
 
 	virtual void onDraw(Renderer& renderer) override;
-	virtual void onMove(i32 x, i32 y) override;
-	virtual void onClick(u8 button, i32 x, i32 y) override;
-	virtual void onDoubleClick(u8 button, i32 x, i32 y) override;
-	virtual void onPress(u8 button, i32 x, i32 y) override;
-	virtual void onRelease(u8 button, i32 x, i32 y) override;
-	virtual void onScroll(i8 direction) override;
+	virtual void onMove(int x, int y) override;
+	virtual void onClick(int button, int x, int y) override;
+	virtual void onDoubleClick(int button, int x, int y) override;
+	virtual void onPress(int button, int x, int y) override;
+	virtual void onRelease(int button, int x, int y) override;
+	virtual void onScroll(int direction) override;
 	virtual void onType(char chr) override;
 
 	virtual void onEnter() override;
 	virtual void onExit() override;
 
 	virtual void onBlur() override;
-	virtual void onKeyPress(u32 key, u32 mod) override;
+	virtual void onKeyPress(int key, int mod) override;
 
-	f32 value() const { return m_value; }
-	void value(f32 v);
+	float value() const { return m_value; }
+	void value(float v);
 
-	f32 minimum() const { return m_min; }
-	void minimum(f32 v) { m_min = v; }
+	float minimum() const { return m_min; }
+	void minimum(float v) { m_min = v; }
 
-	f32 maximum() const { return m_max; }
-	void maximum(f32 v) { m_max = v; }
+	float maximum() const { return m_max; }
+	void maximum(float v) { m_max = v; }
 
-	f32 step() const { return m_step; }
-	void step(f32 v) { m_step = v; }
+	float step() const { return m_step; }
+	void step(float v) { m_step = v; }
 
 	std::string suffix() const { return m_suffix; }
 	void suffix(const std::string& v) { m_suffix = v; }
@@ -41,19 +41,19 @@ public:
 	bool draggable() const { return m_draggable; }
 	void draggable(bool v) { m_draggable = v; }
 
-	void onChange(const std::function<void(f32)>& cb) { m_onChange = cb; }
+	void onChange(const std::function<void(float)>& cb) { m_onChange = cb; }
 
-	f32* userData() { return m_userData; }
+	float* userData() { return m_userData; }
 
 protected:
-	std::function<void(f32)> m_onChange;
+	std::function<void(float)> m_onChange;
 
-	f32* m_userData{ nullptr };
-	f32 m_value{ 0.0f }, m_min{ 0.0f }, m_max{ 1.0f }, m_step{ 0.1f };
-	u8 m_decState{ 0 }, m_incState{ 0 };
+	float* m_userData{ nullptr };
+	float m_value{ 0.0f }, m_min{ 0.0f }, m_max{ 1.0f }, m_step{ 0.1f };
+	int m_decState{ 0 }, m_incState{ 0 };
 
 	std::string m_suffix{ };
-	i32 m_mx{ 0 };
+	int m_mx{ 0 };
 
 	bool m_editing{ false }, m_draggable{ true };
 	std::string m_valText{};

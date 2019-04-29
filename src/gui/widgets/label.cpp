@@ -3,7 +3,7 @@
 #include "panel.h"
 
 void Label::onDraw(Renderer& renderer) {
-	i32 tw = renderer.textWidth(m_text) + 1;
+	int tw = renderer.textWidth(m_text) + 1;
 
 	bounds().height = 22;
 
@@ -12,7 +12,7 @@ void Label::onDraw(Renderer& renderer) {
 	}
 
 	auto b = realBounds();
-	i32 tx = 0;
+	int tx = 0;
 	switch (m_textAlign) {
 		case Alignment::Center: tx = b.width / 2 - tw / 2; break;
 		case Alignment::Right: tx = b.width - tw; break;

@@ -5,10 +5,10 @@
 
 void BorderLayout::apply(Panel* panel, std::vector<Widget*> widgets) {
 	auto b = panel->realBounds();
-	i32 top = panel->padding();
-	i32 bottom = b.height - panel->padding();
-	i32 left = panel->padding();
-	i32 right = b.width - panel->padding();
+	int top = panel->padding();
+	int bottom = b.height - panel->padding();
+	int left = panel->padding();
+	int right = b.width - panel->padding();
 
 	for (Widget* w : widgets) {
 		BorderLayoutPosition param = BorderLayoutPosition(w->layoutParam());
@@ -53,12 +53,12 @@ void BorderLayout::apply(Panel* panel, std::vector<Widget*> widgets) {
 
 void GridLayout::apply(Panel* panel, std::vector<Widget*> widgets) {
 	auto b = panel->realBounds();
-	const u32 spacingWidth = (panel->gridWidth() - 1) * panel->spacing();
-	const u32 spacingHeight = (panel->gridHeight() - 1) * panel->spacing();
-	const u32 width = b.width - (spacingWidth + panel->padding() * 2);
-	const u32 height = b.height - (spacingHeight + panel->padding() * 2);
-	const u32 cellWidth = width / panel->gridWidth();
-	const u32 cellHeight = height / panel->gridHeight();
+	const int spacingWidth = (panel->gridWidth() - 1) * panel->spacing();
+	const int spacingHeight = (panel->gridHeight() - 1) * panel->spacing();
+	const int width = b.width - (spacingWidth + panel->padding() * 2);
+	const int height = b.height - (spacingHeight + panel->padding() * 2);
+	const int cellWidth = width / panel->gridWidth();
+	const int cellHeight = height / panel->gridHeight();
 
 	for (Widget* w : widgets) {
 		w->bounds().x = w->gridColumn() * (cellWidth + panel->spacing()) + panel->padding();
@@ -69,7 +69,7 @@ void GridLayout::apply(Panel* panel, std::vector<Widget*> widgets) {
 }
 
 void StackLayout::apply(Panel* panel, std::vector<Widget*> widgets) {
-	i32 y = panel->padding();
+	int y = panel->padding();
 	for (Widget* w : widgets) {
 		w->bounds().x = panel->padding();
 		w->bounds().y = y;
@@ -79,7 +79,7 @@ void StackLayout::apply(Panel* panel, std::vector<Widget*> widgets) {
 }
 
 void FlowLayout::apply(Panel* panel, std::vector<Widget*> widgets) {
-	i32 x = panel->padding();
+	int x = panel->padding();
 	for (Widget* w : widgets) {
 		w->bounds().x = x;
 		w->bounds().y = panel->padding();

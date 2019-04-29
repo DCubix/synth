@@ -1,7 +1,6 @@
 #include "panel.h"
 
 #include "../gui.h"
-#include "../../log/log.h"
 
 Panel::Panel() {
 	setLayout(new GridLayout());
@@ -68,22 +67,6 @@ void Panel::setLayout(Layout* layout) {
 }
 
 void Panel::performLayout() {
-	// auto b = realBounds();
-	// const u32 spacingWidth = (m_gridWidth - 1) * m_spacing;
-	// const u32 spacingHeight = (m_gridHeight - 1) * m_spacing;
-	// const u32 width = b.width - (spacingWidth + m_padding * 2);
-	// const u32 height = b.height - (spacingHeight + m_padding * 2);
-	// const u32 cellWidth = width / m_gridWidth;
-	// const u32 cellHeight = height / m_gridHeight;
-
-	// for (Widget* w : m_children) {
-	// 	w->bounds().x = w->gridColumn() * (cellWidth + m_spacing) + m_padding;
-	// 	w->bounds().y = w->gridRow() * (cellHeight + m_spacing) + m_padding;
-	// 	w->bounds().width = (cellWidth * w->columnSpan() + m_spacing * (w->columnSpan() - 1));
-	// 	w->bounds().height = (cellHeight * w->rowSpan() + m_spacing * (w->rowSpan() - 1));
-	// 	w->bounds().x += b.x;
-	// 	w->bounds().y += b.y;
-	// }
 	if (m_layout) {
 		m_layout->apply(this, m_children);
 	}

@@ -2,6 +2,7 @@
 
 #include <algorithm>
 
+#include "sdl_headers.h"
 #include "widgets/spinner.h"
 
 GUI::GUI(SDL_Renderer* ren) {
@@ -16,11 +17,11 @@ GUI::GUI(SDL_Renderer* ren) {
 }
 
 Spinner* GUI::spinner(
-	f32* value, f32 vmin, f32 vmax,
+	float* value, float vmin, float vmax,
 	const std::string& suffix,
 	bool drag,
 	const std::function<void()> onChange,
-	f32 step
+	float step
 ) {
 	Spinner* spn = create<Spinner>();
 	spn->m_userData = value;
@@ -30,8 +31,8 @@ Spinner* GUI::spinner(
 	spn->suffix(suffix);
 	spn->step(step);
 	spn->value(*value);
-	spn->onChange([=](f32 val) {
-		f32* _value = spn->userData();
+	spn->onChange([=](float val) {
+		float* _value = spn->userData();
 		(*_value) = val;
 		if (onChange) onChange();
 	});
@@ -56,19 +57,19 @@ void GUI::destroy(Widget* widget) {
 	m_clear = true;
 }
 
-void GUI::render(i32 width, i32 height) {
+void GUI::render(int width, int height) {
 	m_root->bounds().width = width;
 	m_root->bounds().height = height;
 
 	// Clean orphans (except main panel)
-	std::vector<u32> orphans;
-	for (u32 i = 1; i < m_widgets.size(); i++) {
+	std::vector<int> orphans;
+	for (int i = 1; i < m_widgets.size(); i++) {
 		if (m_widgets[i]->parent() == nullptr) {
 			orphans.push_back(i);
 		}
 	}
 	std::reverse(orphans.begin(), orphans.end());
-	for (u32 i : orphans) {
+	for (int i : orphans) {
 		m_widgets.erase(m_widgets.begin() + i);
 	}
 	//
