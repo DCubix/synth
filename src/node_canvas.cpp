@@ -35,12 +35,12 @@ void NodeCanvas::onDraw(Renderer& renderer) {
 	
 	// Grid
 	for (int y = b.y; y < b.y + b.height; y += GridSize) {
-		renderer.line(b.x, y, b.x + b.width, y, 196, 212, 209, 80);
+		renderer.line(b.x, y, b.x + b.width, y, 196, 212, 209, 50);
 	}
 	for (int x = b.x; x < b.x + b.width; x += GridSize) {
-		renderer.line(x, b.y, x, b.y + b.height, 196, 212, 209, 80);
+		renderer.line(x, b.y, x, b.y + b.height, 196, 212, 209, 50);
 	}
-	renderer.rect(b.x, b.y, b.width, b.height, 196, 212, 209, 80);
+	renderer.rect(b.x, b.y, b.width, b.height, 196, 212, 209, 50);
 	//
 
 	renderer.rect(b.x, b.y, b.width, b.height, 0, 0, 0, 80, true);

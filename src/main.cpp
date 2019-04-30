@@ -52,7 +52,7 @@ void midiCallback(double dt, std::vector<u8>* message, void* userdata) {
 	u8 param1 = data[2] & 0x7F;
 	u32 param = (param0 & 0x7F) | (param1 & 0x7F) << 7;
 
-	LogI("MIDI: CMD = ", (command), ", P0 = ", int(param0), ", P1 = ", int(param1), " (", param, ")");
+	// LogI("MIDI: CMD = ", (command), ", P0 = ", int(param0), ", P1 = ", int(param1), " (", param, ")");
 
 	switch (command) {
 		case MidiCommand::NoteOn: {
@@ -63,6 +63,14 @@ void midiCallback(double dt, std::vector<u8>* message, void* userdata) {
 			}
 		} break;
 		case MidiCommand::NoteOff: sys->noteOff(param0, 0.0f); break;
+		case MidiCommand::ContinuousController:
+			switch (param0) {
+				default: break;
+				case 64: {
+					param1 > 0 ? sys->sustainOn() : sys->sustainOff();
+				} break;
+			}
+			break;
 		default: break;
 	}
 }
@@ -70,13 +78,20 @@ void midiCallback(double dt, std::vector<u8>* message, void* userdata) {
 void callback(void* userdata, Uint8* stream, int len) {
 	Synth* sys = static_cast<Synth*>(userdata);
 
-	const int flen = len / sizeof(f32);
-	f32* fstream = reinterpret_cast<f32*>(stream);
+	//const int flen = len / sizeof(f32);
+	//f32* fstream = reinterpret_cast<f32*>(stream);
 
-	for (int i = 0; i < flen; i+=2) {
+	const int ulen = len / sizeof(i32);
+	i32* ustream = reinterpret_cast<i32*>(stream);
+
+	for (int i = 0; i < ulen; i+=2) {
 		auto s = sys->sample();
-		fstream[i + 0] = s.L;
-		fstream[i + 1] = s.R;
+		i32 l = static_cast<i32>(s.L * f32(INT32_MAX-1));
+		i32 r = static_cast<i32>(s.R * f32(INT32_MAX-1));
+		//fstream[i + 0] = s.L;
+		//fstream[i + 1] = s.R;
+		ustream[i + 0] = l;
+		ustream[i + 1] = r;
 	}
 }
 
@@ -99,16 +114,25 @@ int main(int argc, char** argv) {
 	bool saved = true;
 	std::string savedFile = "";
 	std::unique_ptr<Synth> vm = std::unique_ptr<Synth>(new Synth());
+
+	// MIDI Setup
+	std::unique_ptr<RtMidiIn> midin;
 	try {
-		std::unique_ptr<RtMidiIn> midin = std::unique_ptr<RtMidiIn>(new RtMidiIn(
+		midin = std::make_unique<RtMidiIn>(
 			RtMidi::UNSPECIFIED, "Synth MIDI In"
-		));
+		);
 		midin->openPort(0, "SYMain In");
 		midin->setCallback(&midiCallback, vm.get());
 		midin->ignoreTypes();
+		LogI("Initialized MIDI");
 	} catch (RtMidiError& error) {
-		error.printMessage();
+		LogE(error.getMessage());
 	}
+	LogI("MIDI Ports: ", midin->getPortCount());
+	for (u32 i = 0; i < midin->getPortCount(); i++) {
+		LogI("\tPort ", i, ": ", midin->getPortName(i));
+	}
+	//
 	
 	GUI* gui = new GUI(ren);
 	Panel* root = gui->root();
@@ -560,11 +584,11 @@ int main(int argc, char** argv) {
 	SDL_AudioDeviceID device;
 	SDL_AudioSpec spec;
 	spec.freq = 44100;
-	spec.samples = 128;
+	spec.samples = 256;
 	spec.channels = 2;
 	spec.callback = callback;
 	spec.userdata = vm.get();
-	spec.format = AUDIO_F32;
+	spec.format = AUDIO_S32;
 
 	SDL_AudioSpec obspec;
 	if ((device = SDL_OpenAudioDevice(nullptr, 0, &spec, &obspec, 0)) < 0) {

@@ -23,7 +23,7 @@ extern "C" {
 
 constexpr u32 SynMaxNodes = 256;
 constexpr u32 SynMaxConnections = 512;
-constexpr u32 SynMaxVoices = 16;
+constexpr u32 SynMaxVoices = 64;
 constexpr u32 OutputNode = 0;
 
 struct Sample {
@@ -32,6 +32,16 @@ struct Sample {
 	Sample() = default;
 	Sample(f32 v) : L(v), R(v) {}
 	Sample(f32 l, f32 r) : L(l), R(r) {}
+
+	inline Sample& operator +=(const Sample& s) {
+		L += s.L;
+		R += s.R;
+		return *this;
+	}
+
+	inline Sample operator *(f32 level) {
+		return Sample(L * level, R * level);
+	}
 };
 
 enum OpCode {
@@ -86,7 +96,7 @@ public:
 	SynthVM();
 
 	void load(const Program& program);
-	f32 execute(f32 sampleRate, u32 channel = 0);
+	Sample execute(f32 sampleRate, u32 channel = 0);
 
 	f32 frequency() const { return m_frequency; }
 	void frequency(f32 v) { m_frequency = v; }
@@ -99,14 +109,14 @@ public:
 private:
 	f32 m_frequency{ 220.0f };
 
-	util::Stack<f32, 512> m_stack;
+	util::Stack<Sample, 512> m_stack;
 
 	Program m_program;
-	f32 m_out{ 0.0f };
+	Sample m_out{ 0.0f, 0.0f };
 
 	std::array<Phase, 128> m_phases;
 	std::array<ADSR, 128> m_envs;
-	std::array<f32, SynMaxNodes> m_storage;
+	std::array<Sample, SynMaxNodes> m_storage;
 	u32 m_usedEnvs{ 0 };
 
 	ADSR* m_longestEnv{ nullptr };
@@ -122,16 +132,16 @@ public:
 	void setNote(u32 note);
 
 	bool active() const { return m_active; }
-	void free() { m_active = false; }
+	void free() { m_active = false; m_note = 0; m_sustained = false; }
 
 	Sample sample(f32 sampleRate);
 	SynthVM& vm() { return *m_vm.get(); }
 
 protected:
 	std::unique_ptr<SynthVM> m_vm;
-	u32 m_note;
+	u32 m_note{ 0 };
 	f32 m_velocity{ 0.0f };
-	bool m_active{ false };
+	bool m_active{ false }, m_sustained{ false };
 };
 
 class Synth {
@@ -151,16 +161,20 @@ public:
 	bool chorusEnabled() const { return m_chorusEnabled; }
 	void chorusEnabled(bool v) { m_chorusEnabled = v; }
 
+	void sustainOn();
+	void sustainOff();
+
 private:
 	std::array< std::unique_ptr<Voice>, SynMaxVoices> m_voices;
-	Voice* findFreeVoice();
+	Voice* findFreeVoice(u32 note);
+	Voice* getVoice(u32 note);
 	Program m_program;
 
 	f32 m_sampleRate{ 44100.0f };
 
 	sf_compressor_state_st m_compressor;
 	Chorus m_chorus;
-	bool m_chorusEnabled{ false };
+	bool m_chorusEnabled{ false }, m_sustain{ false };
 };
 
 enum class NodeType {

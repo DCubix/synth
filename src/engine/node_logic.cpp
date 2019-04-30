@@ -257,15 +257,17 @@ void SynthVM::load(const Program& program) {
 	m_lock.unlock();
 }
 
-f32 SynthVM::execute(f32 sampleRate, u32 channel) {
+Sample SynthVM::execute(f32 sampleRate, u32 channel) {
 #define PUSH(x) if (m_stack.canPush()) m_stack.push((x))
+#define PUSHf(x) if (m_stack.canPush()) m_stack.push(Sample(x))
 #define POP(x) if (!m_stack.empty()) { x = m_stack.top(); m_stack.pop(); }
+#define POPf(x) if (!m_stack.empty()) { x = m_stack.top().L; m_stack.pop(); }
 #define POPA(x) if (!m_stack.empty()) { x += m_stack.top(); m_stack.pop(); }
-#define PAN (channel == 0 ? 1.0f - pan : pan)
+#define POPAf(x) if (!m_stack.empty()) { x += m_stack.top().L; m_stack.pop(); }
 	
 	u32 i = 0 /* Phase */, e = 0 /* Env */;
 	u32 pc = 0;
-	f32 result = 0.0f;
+	Sample result{ 0.0f };
 	f32 level = 1.0f, pan = 0.5f;
 
 	while (pc < m_program.size()) {
@@ -275,31 +277,36 @@ f32 SynthVM::execute(f32 sampleRate, u32 channel) {
 			case OpPush: PUSH(ins.param); break;
 			case OpPushPtr: PUSH(*ins.paramPtr); break;
 			case OpOut: {
-				POP(pan);
-				POP(level);
-				f32 val = 0.0f;
+				POPf(pan);
+				POPf(level);
+				Sample val{ 0.0f };
 
 				// mix all the inputs
 				while (!m_stack.empty()) {
 					POPA(val);
 				}
-				result = val * level * PAN;
+				result.L = val.L * level * (1.0f - pan);
+				result.R = val.R * level * pan;
 				m_out = result;
 			} break;
 			case OpSine: {
-				f32 freqMod = 0.0f;
+				Sample freqMod{ 0.0f };
 				f32 offset = 0.0f;
 				f32 lvlm = 1.0f;
-				POP(pan);
-				POP(level);
-				POP(lvlm);
-				POP(offset);
+				POPf(pan);
+				POPf(level);
+				POPf(lvlm);
+				POPf(offset);
 				while (!m_stack.empty()) {
 					POPA(freqMod);
 				}
-				f32 freqVal = m_phases[i++].advance(m_frequency + offset, sampleRate) + freqMod;
-				f32 s = ::cosf(freqVal);
-				result = s * level * lvlm * PAN;
+				f32 p = m_phases[i++].advance(m_frequency + offset, sampleRate);
+				f32 freqL = p + freqMod.L;
+				f32 freqR = p + freqMod.R;
+				f32 sL = ::cosf(freqL);
+				f32 sR = ::cosf(freqR);
+				result.L = sL * level * lvlm * (1.0f - pan);
+				result.R = sR * level * lvlm * pan;
 				PUSH(result);
 			} break;
 			case OpLFO: {
@@ -307,80 +314,84 @@ f32 SynthVM::execute(f32 sampleRate, u32 channel) {
 				f32 vmin = 0.0f;
 				f32 vmax = 0.0f;
 				f32 lvlm = 1.0f;
-				POP(pan);
-				POP(level);
-				POP(lvlm);
-				POP(freq);
-				POP(vmax);
-				POP(vmin);
+				POPf(pan);
+				POPf(level);
+				POPf(lvlm);
+				POPf(freq);
+				POPf(vmax);
+				POPf(vmin);
 				f32 freqVal = m_phases[i++].advance(freq, sampleRate);
 				f32 s = vmin + (::sinf(freqVal) * 0.5f + 0.5f) * (vmax - vmin);
-				result = s * level * lvlm;
+				result.L = s * level * lvlm * (1.0f - pan);
+				result.R = s * level * lvlm * pan;
 				PUSH(result);
 			} break;
 			case OpADSR: {
 				f32 a = 0.0f, d = 0.0f, s = 1.0f, r = 0.0f;
-				POP(pan);
-				POP(level);
-				POP(r);
-				POP(s);
-				POP(d);
-				POP(a);
+				POPf(pan);
+				POPf(level);
+				POPf(r);
+				POPf(s);
+				POPf(d);
+				POPf(a);
 				ADSR& env = m_envs[e++];
 				env.attack(a * sampleRate);
 				env.decay(d * sampleRate);
 				env.sustain(s);
 				env.release(r * sampleRate);
-				result = env.sample() * level;
+				result.L = result.R = env.sample() * level;
 				PUSH(result);
 			} break;
 			case OpMap: {
-				f32 in = 0.0f;
+				Sample in{ 0.0f };
 				f32 fmi = 0.0f, fma = 1.0f, tmi = 0.0f, tma = 1.0f;
-				POP(pan);
-				POP(level);
+				POPf(pan);
+				POPf(level);
 				POP(in);
-				POP(tma);
-				POP(tmi);
-				POP(fma);
-				POP(fmi);
-				f32 norm = (in - fmi) / (fma - fmi);
-				result = (norm + tmi) * (tma - tmi);
+				POPf(tma);
+				POPf(tmi);
+				POPf(fma);
+				POPf(fmi);
+				f32 normL = (in.L - fmi) / (fma - fmi);
+				f32 normR = (in.R - fmi) / (fma - fmi);
+				result.L = (normL + tmi) * (tma - tmi);
+				result.R = (normR + tmi) * (tma - tmi);
 				PUSH(result);
 			} break;
 			case OpWrite: {
-				f32 chan = 0.0f, in = 0.0f;
-				POP(pan);
-				POP(level);
+				f32 chan = 0.0f;
+				Sample in{ 0.0f };
+				POPf(pan);
+				POPf(level);
 				POP(in);
-				POP(chan);
+				POPf(chan);
 				m_storage[u32(chan) % m_storage.size()] = in * level;
 				result = m_storage[u32(chan) % m_storage.size()];
 				PUSH(result);
 			} break;
 			case OpRead: {
 				f32 chan = 0.0f;
-				POP(pan);
-				POP(level);
-				POP(chan);
+				POPf(pan);
+				POPf(level);
+				POPf(chan);
 				result = m_storage[u32(chan) % m_storage.size()] * level;
 				PUSH(result);
 			} break;
 			case OpValue: {
 				f32 val = 0.0f;
-				POP(pan);
-				POP(level);
-				POP(val);
-				result = val * level;
+				POPf(pan);
+				POPf(level);
+				POPf(val);
+				result.L = result.R = val * level;
 				PUSH(result);
 			} break;
 			case OpMul: {
 				f32 a = 0.0f, b = 0.0f;
-				POP(pan);
-				POP(level);
-				POP(b);
-				POP(a);
-				result = (a * b) * level;
+				POPf(pan);
+				POPf(level);
+				POPf(b);
+				POPf(a);
+				result.L = result.R = (a * b) * level;
 				PUSH(result);
 			} break;
 		}
@@ -417,12 +428,10 @@ void Voice::setNote(u32 note) {
 }
 
 Sample Voice::sample(f32 sampleRate) {
-	if (!m_active) return { 0.0f, 0.0f };
-	f32 L = m_vm->execute(sampleRate, 0);
-	f32 R = m_vm->execute(sampleRate, 1);
+	Sample s = m_vm->execute(sampleRate);
 	return {
-		L * m_velocity,
-		R * m_velocity
+		s.L * m_velocity,
+		s.R * m_velocity
 	};
 }
 
@@ -434,28 +443,40 @@ Synth::Synth() {
 }
 
 void Synth::noteOn(u32 noteNumber, f32 velocity) {
-	Voice* voice = findFreeVoice();
+	Voice* voice = findFreeVoice(noteNumber);
 	if (!voice) return;
-	voice->setNote(noteNumber);
+
 	voice->m_velocity = velocity;
 	voice->m_active = true;
-	for (auto&& env : voice->vm().envelopes()) {
-		env.active = true;
-		env.gate(true);
+	if (voice->m_note == noteNumber) {
+		LogW("!!Retrigger Voice!!");
+		for (auto&& env : voice->vm().envelopes()) {
+			env.active = true;
+			env.gate(false);
+			env.reset();
+			env.gate(true);
+		}
+	} else {
+		for (auto&& env : voice->vm().envelopes()) {
+			env.active = true;
+			env.gate(true);
+		}
 	}
+	voice->setNote(noteNumber);
 }
 
 void Synth::noteOff(u32 noteNumber, f32 velocity) {
-	for (u32 i = 0; i < SynMaxVoices; i++) {
-		Voice& voice = *m_voices[i].get();
-		if (voice.active() && voice.m_note == noteNumber) {
-			if (voice.vm().usedEnvelopes() == 0) voice.free();
-			else {
-				for (u32 e = 0; e < voice.vm().usedEnvelopes(); e++) {
-					voice.vm().envelopes()[e].gate(false);
-				}
+	Voice* voice = getVoice(noteNumber);
+	if (!voice) return;
+	if (!m_sustain) {
+		if (voice->vm().usedEnvelopes() == 0) voice->free();
+		else {
+			for (u32 e = 0; e < voice->vm().usedEnvelopes(); e++) {
+				voice->vm().envelopes()[e].gate(false);
 			}
 		}
+	} else {
+		voice->m_sustained = true;
 	}
 }
 
@@ -463,10 +484,15 @@ Sample Synth::sample() {
 	Sample out{ 0.0f, 0.0f };
 	for (int i = 0; i < SynMaxVoices; i++) {
 		Voice& voice = *m_voices[i].get();
+		if (!voice.active()) continue;
+
 		auto s = voice.sample(m_sampleRate);
 
 		auto env = voice.vm().getLongestEnvelope();
-		if (env && !env->active) voice.free();
+		if (env && !env->active) {
+			voice.free();
+			LogI("Freed voice #", i);
+		}
 
 		out.L += s.L;
 		out.R += s.R;
@@ -494,11 +520,48 @@ void Synth::setProgram(const Program& program) {
 	for (auto&& voice : m_voices) voice->vm().load(program);
 }
 
-Voice* Synth::findFreeVoice() {
-	for (auto&& voice : m_voices) {
-		if (!voice->active()) return voice.get();
+void Synth::sustainOn() {
+	m_sustain = true;
+}
+
+void Synth::sustainOff() {
+	m_sustain = false;
+	for (u32 i = 0; i < SynMaxVoices; i++) {
+		Voice& voice = *m_voices[i].get();
+		if (!voice.m_sustained) continue;
+		for (u32 e = 0; e < voice.vm().usedEnvelopes(); e++) {
+			voice.vm().envelopes()[e].gate(false);
+			voice.m_sustained = false;
+		}
 	}
-	return nullptr;
+}
+
+Voice* Synth::findFreeVoice(u32 note) {
+	Voice* freeVoice = nullptr;
+	for (auto&& voice : m_voices) {
+		if (!voice->active()) {
+			freeVoice = voice.get();
+			break;
+		} else if (voice->active() && voice->m_note == note) {
+			freeVoice = voice.get();
+			break;
+		}
+	}
+	if (freeVoice == nullptr) {
+		freeVoice = m_voices[0].get();
+	}
+	return freeVoice;
+}
+
+Voice* Synth::getVoice(u32 note) {
+	Voice* voc = nullptr;
+	for (auto&& voice : m_voices) {
+		if (voice->active() && voice->m_note == note) {
+			voc = voice.get();
+			break;
+		}
+	}
+	return voc;
 }
 
 void Value::load(Json json) {
