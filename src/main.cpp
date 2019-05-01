@@ -78,9 +78,6 @@ void midiCallback(double dt, std::vector<u8>* message, void* userdata) {
 void callback(void* userdata, Uint8* stream, int len) {
 	Synth* sys = static_cast<Synth*>(userdata);
 
-	//const int flen = len / sizeof(f32);
-	//f32* fstream = reinterpret_cast<f32*>(stream);
-
 	const int ulen = len / sizeof(i32);
 	i32* ustream = reinterpret_cast<i32*>(stream);
 
@@ -88,8 +85,6 @@ void callback(void* userdata, Uint8* stream, int len) {
 		auto s = sys->sample();
 		i32 l = static_cast<i32>(s.L * f32(INT32_MAX-1));
 		i32 r = static_cast<i32>(s.R * f32(INT32_MAX-1));
-		//fstream[i + 0] = s.L;
-		//fstream[i + 1] = s.R;
 		ustream[i + 0] = l;
 		ustream[i + 1] = r;
 	}
@@ -133,13 +128,13 @@ int main(int argc, char** argv) {
 		LogI("\tPort ", i, ": ", midin->getPortName(i));
 	}
 	//
-	
+
 	GUI* gui = new GUI(ren);
 	Panel* root = gui->root();
 	root->setLayout(new BorderLayout());
 	root->spacing(4);
 	root->padding(4);
-	
+
 	NodeCanvas* cnv = gui->create<NodeCanvas>();
 	cnv->layoutParam(BorderLayoutPosition::Center);
 	root->add(cnv);
@@ -202,7 +197,7 @@ int main(int argc, char** argv) {
 		cnv->create<SineWave>();
 	});
 	buttonsPanel->add(newSine);
-	
+
 	Button* newLFO = gui->create<Button>();
 	newLFO->configure(0, 2, 2);
 	newLFO->text("LFO");

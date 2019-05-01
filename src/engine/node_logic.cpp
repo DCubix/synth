@@ -208,7 +208,7 @@ static void process(NodeSystem* sys, Node* node, Node* prev, ProgramBuilder& out
 			for (u32 cid : conns) {
 				auto conn = sys->getConnection(cid);
 				if (conn) {
-					if (conn->src == conn->dest || 
+					if (conn->src == conn->dest ||
 						sys->getNodeConnection(conn->dest, conn->src) != UINT32_MAX) { // Handle loops
 						out.push(id, conn->dest); // Channel
 						out.push(id, 1.0f); // Lvl
@@ -264,7 +264,7 @@ Sample SynthVM::execute(f32 sampleRate, u32 channel) {
 #define POPf(x) if (!m_stack.empty()) { x = m_stack.top().L; m_stack.pop(); }
 #define POPA(x) if (!m_stack.empty()) { x += m_stack.top(); m_stack.pop(); }
 #define POPAf(x) if (!m_stack.empty()) { x += m_stack.top().L; m_stack.pop(); }
-	
+
 	u32 i = 0 /* Phase */, e = 0 /* Env */;
 	u32 pc = 0;
 	Sample result{ 0.0f };
@@ -515,7 +515,7 @@ Sample Synth::sample() {
 	return { sout.L, sout.R };
 }
 
-void Synth::setProgram(const Program& program) { 
+void Synth::setProgram(const Program& program) {
 	m_program = program;
 	for (auto&& voice : m_voices) voice->vm().load(program);
 }

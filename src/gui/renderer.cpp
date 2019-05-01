@@ -76,8 +76,8 @@ void Renderer::curve(
 	int x1, int y1, int x2, int y2, int x3, int y3, int x4, int y4,
 	int r, int g, int b, int a
 ) {
-	Sint16 vx[] = { x1, x2, x3, x4 };
-	Sint16 vy[] = { y1, y2, y3, y4 };
+	Sint16 vx[] = { Sint16(x1), Sint16(x2), Sint16(x3), Sint16(x4) };
+	Sint16 vy[] = { Sint16(y1), Sint16(y2), Sint16(y3), Sint16(y4) };
 	bezierRGBA(m_ren, vx, vy, 4, 16, r, g, b, a);
 }
 
@@ -123,7 +123,7 @@ void Renderer::arrow(int x, int y, int w, int h, float angle, int r, int g, int 
 		_y2 = x2 * s + y2 * c;
 	float _x3 = x3 * c - y3 * s,
 		_y3 = x3 * s + y3 * c;
-	
+
 	triangle(
 		x + int(_x1), y + int(_y1),
 		x + int(_x2), y + int(_y2),
@@ -238,7 +238,7 @@ void Renderer::patch(int x, int y, int w, int h, int sx, int sy, int sw, int sh,
 	skin(x, y, pad, pad, sx, sy, tpad, tpad); // T
 	skin(x, y + pad, pad, h - pad*2, sx, sy + tpad, tpad, sh - tpad *2); // M
 	skin(x, y + (h - pad), pad, pad, sx, sy + (sh - tpad), tpad, tpad); // B
-	
+
 	// Center
 	int cw = w - pad * 2;
 	int tw = sw - tpad * 2;
@@ -276,7 +276,7 @@ void Renderer::putChar(SDL_Texture* font, int fw, int fh, int x, int y, char c, 
 	const int sy = int(c & 0x7F) / 16 * ch;
 	SDL_Rect dstRect = { x, y, cw, ch };
 	SDL_Rect srcRect = { sx, sy, cw, ch };
-	
+
 	SDL_SetTextureColorMod(font, r, g, b);
 	SDL_SetTextureAlphaMod(font, a);
 	SDL_RenderCopy(m_ren, font, &srcRect, &dstRect);

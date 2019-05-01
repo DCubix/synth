@@ -9,7 +9,7 @@ public:
 		addParam("In");
 	}
 
-	inline NodeType type() { return NodeType::Map; }
+	inline NodeType type() override { return NodeType::Map; }
 
 	inline virtual void load(Json json) override {
 		Node::load(json);

@@ -54,7 +54,6 @@ enum OpCode {
 	OpMap,
 	OpWrite,
 	OpRead,
-	OpNodeID,
 	OpValue,
 	OpMul
 };

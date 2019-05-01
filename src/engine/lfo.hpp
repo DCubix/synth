@@ -15,7 +15,7 @@ public:
 		param(1).value = 1.0f;
 	}
 
-	inline NodeType type() { return NodeType::LFO; }
+	inline NodeType type() override { return NodeType::LFO; }
 
 	inline virtual void load(Json json) override {
 		Node::load(json);

@@ -23,6 +23,7 @@ void BorderLayout::apply(Panel* panel, std::vector<Widget*> widgets) {
 		auto& wb = w->bounds();
 		BorderLayoutPosition param = BorderLayoutPosition(w->layoutParam());
 		switch (param) {
+			default: break;
 			case BorderLayoutPosition::Top: {
 				wb.x = left; wb.y = top;
 				wb.width = right - left;

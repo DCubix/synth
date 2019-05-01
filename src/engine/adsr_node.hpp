@@ -5,7 +5,7 @@
 
 class ADSRNode : public Node {
 public:
-	inline NodeType type() { return NodeType::ADSR; }
+	inline NodeType type() override { return NodeType::ADSR; }
 
 	inline virtual void load(Json json) override {
 		Node::load(json);
