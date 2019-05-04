@@ -13,17 +13,18 @@
 #include "engine/remap.hpp"
 #include "engine/storage.hpp"
 
-#include "gui/gui.h"
-#include "gui/widgets/button.h"
-#include "gui/widgets/spinner.h"
-#include "gui/widgets/check.h"
-#include "gui/widgets/label.h"
-#include "gui/widgets/panel.h"
-#include "gui/widgets/keyboard.h"
-#include "node_canvas.h"
+#ifndef SYN_PERF_TESTS
+#	include "gui/gui.h"
+#	include "gui/widgets/button.h"
+#	include "gui/widgets/spinner.h"
+#	include "gui/widgets/check.h"
+#	include "gui/widgets/label.h"
+#	include "gui/widgets/panel.h"
+#	include "gui/widgets/keyboard.h"
+#	include "node_canvas.h"
+#	include "../osdialog/OsDialog.hpp"
 
 #include "../rtmidi/RtMidi.h"
-#include "../osdialog/OsDialog.hpp"
 
 enum MidiCommand {
 	NoteOff = 0x8,
@@ -89,27 +90,14 @@ void callback(void* userdata, Uint8* stream, int len) {
 		ustream[i + 1] = r;
 	}
 }
+#endif
 
 int main(int argc, char** argv) {
-	SDL_Init(SDL_INIT_EVERYTHING);
-
-	SDL_Window* win;
-	SDL_Renderer* ren;
-
-	win = SDL_CreateWindow(
-		"Synth",
-		SDL_WINDOWPOS_CENTERED,
-		SDL_WINDOWPOS_CENTERED,
-		800, 600,
-		SDL_WINDOW_SHOWN | SDL_WINDOW_RESIZABLE
-	);
-
-	ren = SDL_CreateRenderer(win, -1, SDL_RENDERER_ACCELERATED);
-
 	bool saved = true;
 	std::string savedFile = "";
 	std::unique_ptr<Synth> vm = std::unique_ptr<Synth>(new Synth());
 
+#ifndef SYN_PERF_TESTS
 	// MIDI Setup
 	std::unique_ptr<RtMidiIn> midin;
 	try {
@@ -128,6 +116,21 @@ int main(int argc, char** argv) {
 		LogI("\tPort ", i, ": ", midin->getPortName(i));
 	}
 	//
+
+	SDL_Init(SDL_INIT_EVERYTHING);
+
+	SDL_Window* win;
+	SDL_Renderer* ren;
+
+	win = SDL_CreateWindow(
+		"Synth",
+		SDL_WINDOWPOS_CENTERED,
+		SDL_WINDOWPOS_CENTERED,
+		800, 600,
+		SDL_WINDOW_SHOWN | SDL_WINDOW_RESIZABLE
+	);
+
+	ren = SDL_CreateRenderer(win, -1, SDL_RENDERER_ACCELERATED);
 
 	GUI* gui = new GUI(ren);
 	Panel* root = gui->root();
@@ -592,12 +595,90 @@ int main(int argc, char** argv) {
 	}
 
 	SDL_PauseAudioDevice(device, 0);
+#endif
 
+#ifdef SYN_PERF_TESTS
+#	include "wav.h"
+
+	const std::string testSynth =
+		#include "rhodes.h"
+			;
+	Json json = Json::parse(testSynth);
+
+	NodeSystem* sys = new NodeSystem();
+
+	Json nodes = json["nodes"];
+	Json connections = json["connections"];
+
+	for (int i = 0; i < nodes.size(); i++) {
+		int id = 0;
+		Json node = nodes[i];
+		auto type = node["type"].get<std::string>();
+
+		if (type == "sine") {
+			id = sys->create<SineWave>();
+		} else if (type == "lfo") {
+			id = sys->create<LFO>();
+		} else if (type == "adsr") {
+			id = sys->create<ADSRNode>();
+		} else if (type == "map") {
+			id = sys->create<Map>();
+		} else if (type == "value") {
+			id = sys->create<Value>();
+		} else if (type == "mul") {
+			id = sys->create<Mul>();
+		} else continue;
+
+		sys->get<Node>(id)->load(node);
+	}
+
+	// Connect
+	for (int i = 0; i < connections.size(); i++) {
+		Json conn = connections[i];
+		sys->connect(conn["src"], conn["dest"], conn["destParam"]);
+	}
+
+	// Load Effects...
+	if (json["chorus"].is_object()) {
+		Json chorus = json["chorus"];
+		vm->chorusEnabled(chorus.value("enabled", false));
+		vm->chorusEffect().depth = chorus.value("depth", 0.0f);
+		vm->chorusEffect().width = chorus.value("width", 10.0f);
+		vm->chorusEffect().delay = chorus.value("delay", 10.0f);
+		vm->chorusEffect().freq = chorus.value("freq", 0.2f);
+		vm->chorusEffect().numVoices = chorus.value("numVoices", 2.0f);
+	}
+	vm->setProgram(sys->compile());
+
+	vm->noteOn(48);
+	vm->noteOn(52);
+	vm->noteOn(55);
+	vm->noteOn(59);
+	vm->noteOn(62);
+	vm->noteOn(65);
+	vm->noteOn(69);
+	vm->noteOn(72);
+	vm->noteOn(76);
+	vm->noteOn(79);
+	vm->noteOn(83);
+
+	// Generate samples
+	constexpr u32 Seconds = 10;
+	std::array<f32, Seconds * 44100 * 2> buf;
+	for (u32 i = 0; i < buf.size(); i+=2) {
+		Sample s = vm->sample();
+		buf[i + 0] = s.L;
+		buf[i + 1] = s.R;
+	}
+
+	delete sys;
+#else
 	const double timeStep = 1.0 / 30.0;
 	double lastTime = double(SDL_GetTicks()) / 1000.0;
 	double accum = 0.0;
 
 	SDL_StartTextInput();
+
 	bool running = true;
 	while (running) {
 		bool canRender = false;
@@ -641,10 +722,10 @@ int main(int argc, char** argv) {
 
 	SDL_DestroyRenderer(ren);
 	SDL_DestroyWindow(win);
-
-	SDL_Quit();
-
 	delete gui;
 
+	SDL_CloseAudioDevice(device);
+	SDL_Quit();
+#endif
 	return 0;
 }

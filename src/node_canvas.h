@@ -1,6 +1,7 @@
 #ifndef SYG_NODE_CANVAS_H
 #define SYG_NODE_CANVAS_H
 
+#ifndef SYN_PERF_TESTS
 #include "gui/widgets/widget.h"
 #include "engine/node_logic.h"
 
@@ -77,5 +78,6 @@ private:
 	Link m_link;
 	float m_time{ 0.0f };
 };
+#endif
 
 #endif // SYG_NODE_CANVAS_H

@@ -10,7 +10,12 @@
 #include <vector>
 #include <fstream>
 #include <sstream>
-#include <filesystem>
+#include <iomanip>
+
+#ifndef SYN_PERF_TESTS
+#	include <filesystem>
+namespace fs = std::filesystem;
+#endif
 
 using u8  = uint8_t;
 using u16 = uint16_t;
@@ -29,8 +34,6 @@ using f64 = double;
 
 #include "json.hpp"
 using Json = nlohmann::json;
-namespace fs = std::filesystem;
-
 namespace util {
 	inline f32 lerp(f32 a, f32 b, f32 t) {
 		return (1.0f - t) * a + b * t;
@@ -71,6 +74,7 @@ namespace util {
 		i32 m_top{ -1 };
 	};
 
+#ifndef SYN_PERF_TESTS
 	namespace pack {
 
 		inline void saveFile(const std::string& path, const Json& json) {
@@ -93,6 +97,7 @@ namespace util {
 			return json;
 		}
 	}
+#endif
 
 }
 

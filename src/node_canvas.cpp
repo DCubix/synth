@@ -1,5 +1,7 @@
 #include "node_canvas.h"
 
+#ifndef SYN_PERF_TESTS
+
 #include "log/log.h"
 #include "engine/sine_wave.hpp"
 #include "engine/lfo.hpp"
@@ -457,3 +459,4 @@ void NodeCanvas::save(Json& json) {
 	}
 	json["connections"] = connections;
 }
+#endif
