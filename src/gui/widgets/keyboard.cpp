@@ -153,6 +153,20 @@ void Keyboard::onKeyRelease(int key, int mod) {
 	invalidate();
 }
 
+void Keyboard::noteOn(int note, float velocity) {
+	int nt = note - 21;
+	m_keys[nt] = true;
+	if (m_onNoteOn) m_onNoteOn(note, velocity);
+	invalidate();
+}
+
+void Keyboard::noteOff(int note, float velocity) {
+	int nt = note - 21;
+	m_keys[nt] = false;
+	if (m_onNoteOn) m_onNoteOff(note, velocity);
+	invalidate();
+}
+
 void Keyboard::handleClick(int x, int y) {
 	auto b = realBounds();
 	int WhiteKeyWidth = b.width / WhiteKeys;

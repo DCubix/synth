@@ -18,13 +18,16 @@
 #include "../log/log.h"
 
 extern "C" {
-#include "../../sndfilter/src/compressor.h"
+	#include "../../sndfilter/src/compressor.h"
 }
 
 constexpr u32 SynMaxNodes = 256;
 constexpr u32 SynMaxConnections = 512;
 constexpr u32 SynMaxVoices = 64;
+constexpr u32 SynSampleCount = 8;
 constexpr u32 OutputNode = 0;
+
+using Float8 = std::array<f32, SynSampleCount>;
 
 struct Sample {
 	f32 L{ 0.0f }, R{ 0.0f };
@@ -95,10 +98,7 @@ public:
 	SynthVM();
 
 	void load(const Program& program);
-	Sample execute(f32 sampleRate, u32 channel = 0);
-
-	f32 frequency() const { return m_frequency; }
-	void frequency(f32 v) { m_frequency = v; }
+	Float8 execute(f32 sampleRate, f32 frequency, u32 channel = 0);
 
 	std::array<ADSR, 128>& envelopes() { return m_envs; }
 	u32 usedEnvelopes() const { return m_usedEnvs; }
@@ -106,16 +106,17 @@ public:
 	ADSR* getLongestEnvelope();
 
 private:
-	f32 m_frequency{ 220.0f };
-
-	util::Stack<Sample, 512> m_stack;
+	util::Stack<Float8, 512> m_resultStack;
+	util::Stack<f32, 512> m_valueStack;
+	Float8 m_out{ 0.0f };
 
 	Program m_program;
-	Sample m_out{ 0.0f, 0.0f };
 
 	std::array<Phase, 128> m_phases;
 	std::array<ADSR, 128> m_envs;
-	std::array<Sample, SynMaxNodes> m_storage;
+
+	std::array<Float8, SynMaxNodes> m_storage;
+
 	u32 m_usedEnvs{ 0 };
 
 	ADSR* m_longestEnv{ nullptr };
@@ -123,24 +124,17 @@ private:
 	std::mutex m_lock;
 };
 
-class Voice {
+struct Voice {
 	friend class Synth;
-public:
-	Voice();
+
+	Voice() = default;
 
 	void setNote(u32 note);
+	void free() { active = false; note = 0; sustained = false; }
 
-	bool active() const { return m_active; }
-	void free() { m_active = false; m_note = 0; m_sustained = false; }
-
-	Sample sample(f32 sampleRate);
-	SynthVM& vm() { return *m_vm.get(); }
-
-protected:
-	std::unique_ptr<SynthVM> m_vm;
-	u32 m_note{ 0 };
-	f32 m_velocity{ 0.0f };
-	bool m_active{ false }, m_sustained{ false };
+	u32 note{ 0 }, index{ 0 };
+	f32 velocity{ 0.0f }, frequency{ 0.0f };
+	bool active{ false }, sustained{ false };
 };
 
 class Synth {
@@ -149,7 +143,7 @@ public:
 
 	void noteOn(u32 noteNumber, f32 velocity = 1.0f);
 	void noteOff(u32 noteNumber, f32 velocity = 1.0f);
-	Sample sample();
+	Float8 sample(u32 channel = 0);
 
 	void setProgram(const Program& program);
 
@@ -164,9 +158,11 @@ public:
 	void sustainOff();
 
 private:
-	std::array< std::unique_ptr<Voice>, SynMaxVoices> m_voices;
+	std::array<Voice, SynMaxVoices> m_voices;
+	std::array<std::unique_ptr<SynthVM>, SynMaxVoices> m_vms;
 	Voice* findFreeVoice(u32 note);
 	Voice* getVoice(u32 note);
+
 	Program m_program;
 
 	f32 m_sampleRate{ 44100.0f };

@@ -23,6 +23,9 @@ public:
 	void onNoteOn(const NoteCallback& cb) { m_onNoteOn = cb; }
 	void onNoteOff(const NoteCallback& cb) { m_onNoteOff = cb; }
 
+	void noteOn(int note, float velocity = 1.0f);
+	void noteOff(int note, float velocity = 1.0f);
+
 private:
 	NoteCallback m_onNoteOn, m_onNoteOff;
 	bool m_drag{ false };

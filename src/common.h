@@ -11,6 +11,7 @@
 #include <fstream>
 #include <sstream>
 #include <iomanip>
+#include <optional>
 
 #ifndef SYN_PERF_TESTS
 #	include <filesystem>
@@ -62,16 +63,48 @@ namespace util {
 		Stack() : m_top(-1) {}
 
 		inline bool empty() { return m_top <= -1; }
-		inline bool canPush() { return m_top < i32(N); }
-		inline void push(T value) { m_data[++m_top] = value; }
-		inline T top() { return m_data[m_top]; }
-		inline void pop() { m_data[m_top--]; }
+		inline void push(T value) {
+			m_data[++m_top] = value;
+		}
+		inline std::optional<T> pop() {
+			if (empty()) return {};
+			return m_data[m_top--];
+		}
 
-		inline void clear() { m_top = -1; m_data.fill(T(0)); }
+		inline void clear(T val) { m_top = -1; m_data.fill(val); }
 
 	private:
 		std::array<T, N> m_data;
 		i32 m_top{ -1 };
+	};
+
+	template <typename T, size_t N>
+	class RingBuffer {
+	public:
+		inline bool push(T value) {
+			u32 next = m_head + 1;
+			if (next >= N) next = 0;
+			if (next == m_tail) return false;
+			m_data[m_head] = value;
+			m_head = next;
+			return true;
+		}
+
+		inline std::optional<T> pop() {
+			if (m_head == m_tail) return {};
+			u32 next = m_tail + 1;
+			if (next >= N) next = 0;
+
+			T data = m_data[m_tail];
+			m_tail = next;
+			return data;
+		}
+
+		inline T* data() { return m_data.data(); }
+
+	private:
+		std::array<T, N> m_data;
+		u32 m_head{ 0 }, m_tail{ 0 };
 	};
 
 #ifndef SYN_PERF_TESTS
