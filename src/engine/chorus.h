@@ -7,6 +7,8 @@
 
 class Chorus {
 public:
+	~Chorus() = default;
+
 	f32 process(f32 in, f32 sampleRate, u32 channel);
 
 	f32 delay{ 30.0f }, width{ 20.0f }, depth{ 1.0f }, freq{ 0.2f };

@@ -5,9 +5,9 @@
 #include "sdl_headers.h"
 #include "widgets/spinner.h"
 
-GUI::GUI(SDL_Renderer* ren) {
+GUI::GUI() {
 	m_events = std::make_unique<EventHandler>();
-	m_renderer = std::make_unique<Renderer>(ren);
+	m_renderer = std::make_unique<Renderer>();
 
 	m_root = create<Panel>();
 	m_root->gridWidth(16);
@@ -74,24 +74,24 @@ void GUI::render(int width, int height) {
 	}
 	//
 
-	if (m_clear) {
-		SDL_RenderClear(m_renderer->sdlRenderer());
-		m_clear = false;
-	}
+	glViewport(0, 0, width, height);
+	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT);
 
-	SDL_SetRenderDrawBlendMode(m_renderer->sdlRenderer(), SDL_BLENDMODE_BLEND);
+	m_renderer->begin(width, height);
+
 	for (auto&& widget : m_widgets) {
 		auto b = widget->bounds();
 		if (widget->parent() == nullptr) {
 			m_renderer->pushClipping(b.x, b.y, b.width, b.height);
 		}
 
-		if ((widget->m_dirty || widget->alwaysRedraw()) && widget->visible()) {
+		if (widget->visible()) {
 			widget->onDraw(*m_renderer.get());
-			widget->m_dirty = false;
 		}
 		if (widget->parent() == nullptr) {
 			m_renderer->popClipping();
 		}
 	}
+
+	m_renderer->end();
 }

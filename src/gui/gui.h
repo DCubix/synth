@@ -11,7 +11,7 @@
 class Spinner;
 class GUI {
 public:
-	GUI(SDL_Renderer* ren);
+	GUI();
 
 	template <typename T, typename... Args>
 	T* create(Args&&... args) {

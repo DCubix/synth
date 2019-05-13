@@ -11,27 +11,38 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS ON)
 
-file(GLOB_RECURSE SRC "*.h" "*.hpp" "*.cpp" "*.c")
+file(GLOB SRC
+	"*.h" "*.hpp" "*.cpp" "*.c"
+
+	"widgets/*.h"
+	"widgets/*.hpp"
+	"widgets/*.cpp"
+	"widgets/*.c"
+
+	"glad/*.h"
+	"glad/*.c"
+)
 
 find_package(SDL2 CONFIG REQUIRED)
-find_package(SDL2_gfx REQUIRED STATIC)
 
 source_group(TREE ${CMAKE_CURRENT_SOURCE_DIR} FILES ${SRC})
 
 add_library(${PROJECT_NAME} STATIC ${SRC})
 target_include_directories(${PROJECT_NAME} PUBLIC /)
 
-if (MINGW)
+add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/nanovg)
+
+if (MINGW OR UNIX)
 	target_link_libraries(${PROJECT_NAME}
 		PRIVATE
 		${SDL2_LIBRARIES}
-		${SDL2_GFX_LIBRARIES}
+		nanovg
 		stdc++fs
 	)
 else()
 	target_link_libraries(${PROJECT_NAME}
 		PRIVATE
 		SDL2::SDL2 SDL2::SDL2main
-		${SDL2_GFX_LIBRARIES}
+		nanovg
 	)
 endif()

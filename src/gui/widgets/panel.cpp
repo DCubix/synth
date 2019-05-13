@@ -18,10 +18,7 @@ void Panel::onDraw(Renderer& renderer) {
 	for (auto&& w : m_children) {
 		if (!w) continue;
 		if (!w->visible()) continue;
-		if (w->dirty() || w->alwaysRedraw()) {
-			w->onDraw(renderer);
-			w->m_dirty = false;
-		}
+		w->onDraw(renderer);
 	}
 	renderer.popClipping();
 }

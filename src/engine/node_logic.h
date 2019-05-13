@@ -12,165 +12,11 @@
 #include <utility>
 
 #include "../common.h"
-#include "phase.h"
-#include "adsr.h"
-#include "chorus.h"
 #include "../log/log.h"
 
-extern "C" {
-	#include "../../sndfilter/src/compressor.h"
-}
+#include "compiler.h"
 
-constexpr u32 SynMaxNodes = 256;
-constexpr u32 SynMaxConnections = 512;
-constexpr u32 SynMaxVoices = 64;
-constexpr u32 SynSampleCount = 8;
 constexpr u32 OutputNode = 0;
-
-using Float8 = std::array<f32, SynSampleCount>;
-
-struct Sample {
-	f32 L{ 0.0f }, R{ 0.0f };
-
-	Sample() = default;
-	Sample(f32 v) : L(v), R(v) {}
-	Sample(f32 l, f32 r) : L(l), R(r) {}
-
-	inline Sample& operator +=(const Sample& s) {
-		L += s.L;
-		R += s.R;
-		return *this;
-	}
-
-	inline Sample operator *(f32 level) {
-		return Sample(L * level, R * level);
-	}
-};
-
-enum OpCode {
-	OpPush = 0,
-	OpPushPtr,
-	OpSine,
-	OpLFO,
-	OpOut,
-	OpADSR,
-	OpMap,
-	OpWrite,
-	OpRead,
-	OpValue,
-	OpMul
-};
-
-struct Instruction {
-	OpCode opcode;
-	f32 param;
-	f32* paramPtr;
-	u32 nodeID;
-};
-using Program = std::vector<Instruction>;
-
-class ProgramBuilder {
-public:
-	inline ProgramBuilder& concat(const Program& initial) {
-		m_program.insert(m_program.begin(), initial.begin(), initial.end());
-		return *this;
-	}
-	inline ProgramBuilder& push(u32 id, f32 value) { m_program.push_back({ OpPush, value, nullptr, id }); return *this; }
-	inline ProgramBuilder& pushp(u32 id, f32* value) { m_program.push_back({ OpPushPtr, 0, value, id }); return *this; }
-	inline ProgramBuilder& sine(u32 id) { m_program.push_back({ OpSine, 0, nullptr, id }); return *this; }
-	inline ProgramBuilder& lfo(u32 id) { m_program.push_back({ OpLFO, 0, nullptr, id }); return *this; }
-	inline ProgramBuilder& out(u32 id) { m_program.push_back({ OpOut, 0, nullptr, id }); return *this; }
-	inline ProgramBuilder& adsr(u32 id) { m_program.push_back({ OpADSR, 0, nullptr, id }); return *this; }
-	inline ProgramBuilder& map(u32 id) { m_program.push_back({ OpMap, 0, nullptr, id }); return *this; }
-	inline ProgramBuilder& read(u32 id) { m_program.push_back({ OpRead, 0, nullptr, id }); return *this; }
-	inline ProgramBuilder& write(u32 id) { m_program.push_back({ OpWrite, 0, nullptr, id }); return *this; }
-	inline ProgramBuilder& value(u32 id, f32 value) { m_program.push_back({ OpValue, value, nullptr, id }); return *this; }
-	inline ProgramBuilder& mul(u32 id) { m_program.push_back({ OpMul, 0.0f, nullptr, id }); return *this; }
-
-	Program build() const { return m_program; }
-
-private:
-	Program m_program;
-};
-
-class SynthVM {
-public:
-	SynthVM();
-
-	void load(const Program& program);
-	Float8 execute(f32 sampleRate, f32 frequency, u32 channel = 0);
-
-	std::array<ADSR, 128>& envelopes() { return m_envs; }
-	u32 usedEnvelopes() const { return m_usedEnvs; }
-
-	ADSR* getLongestEnvelope();
-
-private:
-	util::Stack<Float8, 512> m_resultStack;
-	util::Stack<f32, 512> m_valueStack;
-	Float8 m_out{ 0.0f };
-
-	Program m_program;
-
-	std::array<Phase, 128> m_phases;
-	std::array<ADSR, 128> m_envs;
-
-	std::array<Float8, SynMaxNodes> m_storage;
-
-	u32 m_usedEnvs{ 0 };
-
-	ADSR* m_longestEnv{ nullptr };
-
-	std::mutex m_lock;
-};
-
-struct Voice {
-	friend class Synth;
-
-	Voice() = default;
-
-	void setNote(u32 note);
-	void free() { active = false; note = 0; sustained = false; }
-
-	u32 note{ 0 }, index{ 0 };
-	f32 velocity{ 0.0f }, frequency{ 0.0f };
-	bool active{ false }, sustained{ false };
-};
-
-class Synth {
-public:
-	Synth();
-
-	void noteOn(u32 noteNumber, f32 velocity = 1.0f);
-	void noteOff(u32 noteNumber, f32 velocity = 1.0f);
-	Float8 sample(u32 channel = 0);
-
-	void setProgram(const Program& program);
-
-	f32 sampleRate() const { return m_sampleRate; }
-
-	Chorus& chorusEffect() { return m_chorus; }
-
-	bool chorusEnabled() const { return m_chorusEnabled; }
-	void chorusEnabled(bool v) { m_chorusEnabled = v; }
-
-	void sustainOn();
-	void sustainOff();
-
-private:
-	std::array<Voice, SynMaxVoices> m_voices;
-	std::array<std::unique_ptr<SynthVM>, SynMaxVoices> m_vms;
-	Voice* findFreeVoice(u32 note);
-	Voice* getVoice(u32 note);
-
-	Program m_program;
-
-	f32 m_sampleRate{ 44100.0f };
-
-	sf_compressor_state_st m_compressor;
-	Chorus m_chorus;
-	bool m_chorusEnabled{ false }, m_sustain{ false };
-};
 
 enum class NodeType {
 	None = 0,
@@ -195,7 +41,7 @@ public:
 	};
 
 	Node() = default;
-	~Node() = default;
+	virtual ~Node() = default;
 
 	virtual NodeType type() { return NodeType::None; }
 	virtual void load(Json json);

@@ -19,6 +19,7 @@ struct Link {
 class NodeCanvas : public Widget {
 public:
 	NodeCanvas();
+	virtual ~NodeCanvas() = default;
 
 	template <typename T>
 	int create() {

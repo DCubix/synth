@@ -10,6 +10,8 @@ class Widget : public Element {
 	friend class GUI;
 	friend class Panel;
 public:
+	virtual ~Widget() = default;
+
 	virtual void onDraw(Renderer& renderer) {}
 
 	bool visible() const { return m_visible; }

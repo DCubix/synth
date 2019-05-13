@@ -12,6 +12,7 @@
 #include "engine/adsr_node.hpp"
 #include "engine/remap.hpp"
 #include "engine/storage.hpp"
+#include "engine/synth_vm.h"
 
 #ifndef SYN_PERF_TESTS
 #	include "gui/gui.h"
@@ -41,6 +42,8 @@ enum MidiCommand {
 };
 
 struct MidiUserData {
+	MidiUserData() = default;
+	~MidiUserData() = default;
 	Keyboard* kb;
 	Synth* sys;
 };
@@ -105,25 +108,32 @@ void callback(void* userdata, Uint8* stream, int len) {
 int main(int argc, char** argv) {
 	bool saved = true;
 	std::string savedFile = "";
-	std::unique_ptr<Synth> vm = std::unique_ptr<Synth>(new Synth());
+	std::unique_ptr<Synth> vm = std::make_unique<Synth>();
 
 #ifndef SYN_PERF_TESTS
 	SDL_Init(SDL_INIT_EVERYTHING);
 
 	SDL_Window* win;
-	SDL_Renderer* ren;
+	SDL_GLContext ctx;
 
 	win = SDL_CreateWindow(
 		"Synth",
 		SDL_WINDOWPOS_CENTERED,
 		SDL_WINDOWPOS_CENTERED,
 		800, 600,
-		SDL_WINDOW_SHOWN | SDL_WINDOW_RESIZABLE
+		SDL_WINDOW_SHOWN | SDL_WINDOW_RESIZABLE | SDL_WINDOW_OPENGL
 	);
 
-	ren = SDL_CreateRenderer(win, -1, SDL_RENDERER_ACCELERATED);
+	ctx = SDL_GL_CreateContext(win);
 
-	GUI* gui = new GUI(ren);
+	SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_COMPATIBILITY);
+	SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 2);
+	SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 1);
+	SDL_GL_SetAttribute(SDL_GL_DOUBLEBUFFER, 1);
+
+	SDL_GL_SetSwapInterval(0);
+
+	GUI* gui = new GUI();
 	Panel* root = gui->root();
 	root->setLayout(new BorderLayout());
 	root->spacing(4);
@@ -132,7 +142,7 @@ int main(int argc, char** argv) {
 	Keyboard* kb = gui->create<Keyboard>();
 	MidiUserData udata = { kb, vm.get() };
 
-	// MIDI Setup
+	//// MIDI Setup
 	std::unique_ptr<RtMidiIn> midin;
 	try {
 		midin = std::make_unique<RtMidiIn>(
@@ -402,7 +412,7 @@ int main(int argc, char** argv) {
 	topPanel->add(btOpen);
 
 	auto saveFileFunc = [&](const std::string& fileName) {
-		Json json; cnv->save(json);
+		Json json; //cnv->save(json);
 
 		// Save Effects...
 		json["chorus"]["enabled"] = vm->chorusEnabled();
@@ -683,10 +693,15 @@ int main(int argc, char** argv) {
 	// Generate samples
 	constexpr u32 Seconds = 10;
 	std::array<f32, Seconds * 44100 * 2> buf;
-	for (u32 i = 0; i < buf.size(); i+=2) {
-		Sample s = vm->sample();
-		buf[i + 0] = s.L;
-		buf[i + 1] = s.R;
+
+	const u32 step = 2 * SynSampleCount;
+	for (u32 i = 0; i < buf.size(); i += step) {
+		auto L = vm->sample(0);
+		auto R = vm->sample(1);
+		for (u32 j = 0; j < step; j += 2) {
+			buf[i + j + 0] = L[j/2];
+			buf[i + j + 1] = R[j/2];
+		}
 	}
 
 	delete sys;
@@ -734,11 +749,13 @@ int main(int argc, char** argv) {
 			int w, h;
 			SDL_GetWindowSize(win, &w, &h);
 			gui->render(w, h);
-			SDL_RenderPresent(ren);
+			SDL_GL_SwapWindow(win);
 		}
 	}
+	SDL_PauseAudioDevice(device, 1);
+	SDL_CloseAudioDevice(device);
 
-	SDL_DestroyRenderer(ren);
+	SDL_GL_DeleteContext(ctx);
 	SDL_DestroyWindow(win);
 	SDL_Quit();
 

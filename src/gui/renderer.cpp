@@ -6,138 +6,99 @@
 #include "skin.h"
 #include "font.h"
 #include "font_small.h"
-#include "stb_image.h"
 
-#define MAX_SHADOW 32.0f
+#define MAX_SHADOW 16.0f
 
-Renderer::Renderer(SDL_Renderer* ren)
-	: m_ren(ren)
-{
-	int w, h, comp;
-	unsigned char* pixels = stbi_load_from_memory(skin_data, skin_size, &w, &h, &comp, 4);
-	if (pixels) {
-		m_skin = SDL_CreateTexture(
-			m_ren,
-			SDL_PIXELFORMAT_RGBA32,
-			SDL_TEXTUREACCESS_STATIC,
-			w, h
-		);
-		SDL_UpdateTexture(m_skin, nullptr, (void*)pixels, w * 4);
-		stbi_image_free(pixels);
+extern "C" {
+	#define NANOVG_GL2_IMPLEMENTATION
+	#include "nanovg/src/nanovg_gl.h"
+}
 
-		SDL_SetTextureBlendMode(m_skin, SDL_BLENDMODE_BLEND);
-	}
+Renderer::Renderer() {
+	gladLoadGLLoader(SDL_GL_GetProcAddress);
 
-	pixels = stbi_load_from_memory(font_data, font_size, &w, &h, &comp, 4);
-	if (pixels) {
-		m_fontWidth = w;
-		m_fontHeight = h;
-		m_font = SDL_CreateTexture(
-			m_ren,
-			SDL_PIXELFORMAT_RGBA32,
-			SDL_TEXTUREACCESS_STATIC,
-			w, h
-		);
-		SDL_UpdateTexture(m_font, nullptr, (void*)pixels, w * 4);
-		stbi_image_free(pixels);
+	m_ren = nvgCreateGL2(NVG_ANTIALIAS | NVG_STENCIL_STROKES);
 
-		SDL_SetTextureBlendMode(m_font, SDL_BLENDMODE_BLEND);
-	}
+	m_skin = nvgCreateImageMem(m_ren, 0, skin_data, skin_size);
+	m_font = nvgCreateImageMem(m_ren, 0, font_data, font_size);
+	m_fontSmall = nvgCreateImageMem(m_ren, 0, font_small_data, font_small_size);
 
-	pixels = stbi_load_from_memory(font_small_data, font_small_size, &w, &h, &comp, 4);
-	if (pixels) {
-		m_fontSmallWidth = w;
-		m_fontSmallHeight = h;
-		m_fontSmall = SDL_CreateTexture(
-			m_ren,
-			SDL_PIXELFORMAT_RGBA32,
-			SDL_TEXTUREACCESS_STATIC,
-			w, h
-		);
-		SDL_UpdateTexture(m_fontSmall, nullptr, (void*)pixels, w * 4);
-		stbi_image_free(pixels);
-
-		SDL_SetTextureBlendMode(m_fontSmall, SDL_BLENDMODE_BLEND);
-	}
+	nvgImageSize(m_ren, m_font, &m_fontWidth, &m_fontHeight);
+	nvgImageSize(m_ren, m_fontSmall, &m_fontSmallWidth, &m_fontSmallHeight);
 }
 
 Renderer::~Renderer() {
+	nvgDeleteImage(m_ren, m_skin);
+	nvgDeleteImage(m_ren, m_font);
+	nvgDeleteImage(m_ren, m_fontSmall);
 }
 
 void Renderer::line(int x1, int y1, int x2, int y2, int r, int g, int b, int a, int width) {
-	if (width == 1) {
-		aalineRGBA(m_ren, x1, y1, x2, y2, r, g, b, a);
-	} else {
-		thickLineRGBA(m_ren, x1, y1, x2, y2, width, r, g, b, a);
-	}
+	nvgSave(m_ren);
+	nvgStrokeWidth(m_ren, width);
+	nvgStrokeColor(m_ren, nvgRGBA(r, g, b, a));
+	nvgBeginPath(m_ren);
+	nvgMoveTo(m_ren, x1, y1);
+	nvgLineTo(m_ren, x2, y2);
+	nvgStroke(m_ren);
+	nvgRestore(m_ren);
 }
 
-void Renderer::curve(
-	int x1, int y1, int x2, int y2, int x3, int y3, int x4, int y4,
-	int r, int g, int b, int a
-) {
-	Sint16 vx[] = { Sint16(x1), Sint16(x2), Sint16(x3), Sint16(x4) };
-	Sint16 vy[] = { Sint16(y1), Sint16(y2), Sint16(y3), Sint16(y4) };
-	bezierRGBA(m_ren, vx, vy, 4, 16, r, g, b, a);
+void Renderer::curve(int x1, int y1, int x2, int y2, int x3, int y3, int x4, int y4,
+					 int r, int g, int b, int a, int width) {
+	nvgSave(m_ren);
+	nvgStrokeWidth(m_ren, width);
+	nvgStrokeColor(m_ren, nvgRGBA(r, g, b, a));
+	nvgBeginPath(m_ren);
+	nvgMoveTo(m_ren, x1, y1);
+	nvgBezierTo(m_ren, x2, y2, x3, y3, x4, y4);
+	nvgStroke(m_ren);
+	nvgRestore(m_ren);
 }
 
-void Renderer::multiCurve(const std::vector<int>& positions, int r, int g, int b, int a) {
-	std::vector<Sint16> vx, vy;
-	vx.reserve(positions.size()/2);
-	vy.reserve(positions.size()/2);
-
-	for (int i = 0; i < positions.size(); i += 2) {
-		vx.push_back(positions[i]);
-		vy.push_back(positions[i + 1]);
-	}
-
-	bezierRGBA(m_ren, vx.data(), vy.data(), vx.size(), 16, r, g, b, a);
+void Renderer::roundRect(int x, int y, int w, int h, int rad, int r, int g, int b, int a, bool fill, int width) {
+	nvgSave(m_ren);
+	nvgStrokeWidth(m_ren, width);
+	nvgStrokeColor(m_ren, nvgRGBA(r, g, b, a));
+	nvgFillColor(m_ren, nvgRGBA(r, g, b, a));
+	nvgBeginPath(m_ren);
+	nvgRoundedRect(m_ren, x, y, w, h, rad);
+	if (fill) nvgFill(m_ren);
+	else nvgStroke(m_ren);
+	nvgRestore(m_ren);
 }
 
-void Renderer::roundRect(int x, int y, int w, int h, int rad, int r, int g, int b, int a) {
-	roundedRectangleRGBA(m_ren, x, y, x + w, y + h, rad, r, g, b, a);
-}
-
-void Renderer::arc(int x, int y, int rad, int start, int end, int r, int g, int b, int a) {
-	arcRGBA(m_ren, x, y, rad, start, end, r, g, b, a);
-}
-
-void Renderer::rect(int x, int y, int w, int h, int r, int g, int b, int a, bool fill) {
-	if (fill) boxRGBA(m_ren, x, y, x + w, y + h - 1, r, g, b, a);
-	else      rectangleRGBA(m_ren, x, y, x + w, y + h - 1, r, g, b, a);
-}
-
-void Renderer::triangle(int x1, int y1, int x2, int y2, int x3, int y3, int r, int g, int b, int a) {
-	filledTrigonRGBA(m_ren, x1, y1, x2, y2, x3, y3, r, g, b, a);
-}
-
-void Renderer::arrow(int x, int y, int w, int h, float angle, int r, int g, int b, int a) {
-	const float c = std::cos(angle), s = std::sin(angle);
-	float x1 = w, y1 = -h/2;
-	float x2 = 0, y2 = 0;
-	float x3 = w, y3 = h/2;
-
-	float _x1 = x1 * c - y1 * s,
-		_y1 = x1 * s + y1 * c;
-	float _x2 = x2 * c - y2 * s,
-		_y2 = x2 * s + y2 * c;
-	float _x3 = x3 * c - y3 * s,
-		_y3 = x3 * s + y3 * c;
-
-	triangle(
-		x + int(_x1), y + int(_y1),
-		x + int(_x2), y + int(_y2),
-		x + int(_x3), y + int(_y3),
-		r, g, b, a
-	);
+void Renderer::rect(int x, int y, int w, int h, int r, int g, int b, int a, bool fill, int width) {
+	nvgSave(m_ren);
+	nvgStrokeWidth(m_ren, width);
+	nvgStrokeColor(m_ren, nvgRGBA(r, g, b, a));
+	nvgFillColor(m_ren, nvgRGBA(r, g, b, a));
+	nvgBeginPath(m_ren);
+	nvgRect(m_ren, x, y, w, h);
+	if (fill) nvgFill(m_ren);
+	else nvgStroke(m_ren);
+	nvgRestore(m_ren);
 }
 
 void Renderer::panel(int x, int y, int w, int h, int sx, int sy, float shadow) {
 	const int TS = 64;
 	if (shadow > 0.0f) {
-		const int sz = int(shadow * MAX_SHADOW);
-		const int tsz = sz * 2 < 32 ? sz * 2 : sz;
-		patch((x - sz/2) + sx, (y - sz/2) + sy, w + sz, h + sz, 0, 0, 96, 96, sz, tsz);
+		const float f = std::clamp(shadow, 0.01f, 1.0f) * 30;
+		const float hf = f / 2.0f;
+		// Drop shadow
+		NVGpaint shadowPaint = nvgBoxGradient(
+					m_ren, x + sx, y + sy, w, h, 3, f,
+					nvgRGBA(0, 0, 0, 132),
+					nvgRGBA(0, 0, 0, 0)
+		);
+		nvgSave(m_ren);
+		nvgBeginPath(m_ren);
+		nvgRect(m_ren, x - hf, y - hf, w + f,h + f);
+		nvgRoundedRect(m_ren, x, y, w, h, 3);
+		nvgPathWinding(m_ren, NVG_HOLE);
+		nvgFillPaint(m_ren, shadowPaint);
+		nvgFill(m_ren);
+		nvgRestore(m_ren);
 	}
 	patch(x, y, w, h, 0, 160, TS, TS);
 }
@@ -156,9 +117,22 @@ void Renderer::check(int x, int y, bool state) {
 void Renderer::flatPanel(int x, int y, int w, int h, int sx, int sy, float shadow) {
 	const int TS = 64;
 	if (shadow > 0.0f) {
-		const int sz = int(shadow * MAX_SHADOW);
-		const int tsz = sz * 2 < 32 ? sz * 2 : sz;
-		patch((x - sz / 2) + sx, (y - sz / 2) + sy, w + sz, h + sz, 0, 0, 96, 96, sz, tsz);
+		const float f = std::clamp(shadow, 0.01f, 1.0f) * 30;
+		const float hf = f / 2.0f;
+		// Drop shadow
+		NVGpaint shadowPaint = nvgBoxGradient(
+					m_ren, x + sx, y + sy, w, h, 3, f,
+					nvgRGBA(0, 0, 0, 132),
+					nvgRGBA(0, 0, 0, 0)
+		);
+		nvgSave(m_ren);
+		nvgBeginPath(m_ren);
+		nvgRect(m_ren, x - hf, y - hf, w + f,h + f);
+		nvgRoundedRect(m_ren, x, y, w, h, 3);
+		nvgPathWinding(m_ren, NVG_HOLE);
+		nvgFillPaint(m_ren, shadowPaint);
+		nvgFill(m_ren);
+		nvgRestore(m_ren);
 	}
 	patch(x, y, w, h, 128, 160, TS, TS);
 }
@@ -176,6 +150,7 @@ void Renderer::pushClipping(int x, int y, int w, int h) {
 
 	if (m_clipRects.empty()) {
 		if (w < 1 || h < 1) return;
+		nvgSave(m_ren);
 	} else {
 		// Merge
 		SDL_Rect parent = m_clipRects.top();
@@ -196,8 +171,7 @@ void Renderer::pushClipping(int x, int y, int w, int h) {
 	SDL_Rect cr = { x, y, w, h };
 	m_clipRects.push(cr);
 
-	SDL_SetRenderDrawBlendMode(m_ren, SDL_BLENDMODE_BLEND);
-	SDL_RenderSetClipRect(m_ren, &cr);
+	nvgScissor(m_ren, x, y, w, h);
 }
 
 void Renderer::popClipping() {
@@ -205,10 +179,10 @@ void Renderer::popClipping() {
 		m_clipRects.pop();
 	}
 	if (m_clipRects.empty()) {
-		SDL_RenderSetClipRect(m_ren, nullptr);
+		nvgRestore(m_ren);
 	} else {
 		SDL_Rect cr = m_clipRects.top();
-		SDL_RenderSetClipRect(m_ren, &cr);
+		nvgScissor(m_ren, cr.x, cr.y, cr.w, cr.h);
 	}
 }
 
@@ -221,14 +195,42 @@ void Renderer::textSmall(int x, int y, const std::string& str, int r, int g, int
 }
 
 void Renderer::skin(int x, int y, int w, int h, int sx, int sy, int sw, int sh) {
-	SDL_Rect dstRect = { x, y, w, h };
+	image(m_skin, x, y, w, h, sx, sy, sw, sh);
+}
+
+void Renderer::image(int image, int x, int y, int w, int h, int sx, int sy, int sw, int sh, int r, int g, int b, int a) {
 	if (sx < 0 || sy < 0 || sw < 0 || sh < 0) {
-		SDL_RenderCopy(m_ren, m_skin, nullptr, &dstRect);
-	} else {
-		SDL_Rect srcRect = { sx, sy, sw, sh };
-		SDL_RenderCopy(m_ren, m_skin, &srcRect, &dstRect);
+		sx = x;
+		sy = y;
+		sw = w;
+		sh = h;
 	}
-	//rect(x, y, w, h, 128, 100, 200);
+
+	float ax, ay;
+	int iw, ih;
+	NVGpaint img;
+
+	nvgImageSize(m_ren, image, &iw, &ih);
+
+	ax = float(w) / float(sw);
+	ay = float(h) / float(sh);
+
+	img = nvgImagePattern(m_ren,
+			x - float(sx) * ax,
+			y - float(sy) * ay,
+			float(iw) * ax,
+			float(ih) * ay, 0,
+			image,
+			float(a) / 255.0f
+	);
+	img.innerColor = nvgRGBA(r, g, b, a);
+
+	nvgSave(m_ren);
+	nvgBeginPath(m_ren);
+	nvgRect(m_ren, x, y, w, h);
+	nvgFillPaint(m_ren, img);
+	nvgFill(m_ren);
+	nvgRestore(m_ren);
 }
 
 void Renderer::patch(int x, int y, int w, int h, int sx, int sy, int sw, int sh, int pad, int tpad) {
@@ -254,7 +256,15 @@ void Renderer::patch(int x, int y, int w, int h, int sx, int sy, int sw, int sh,
 	//rect(x, y, w, h, 255, 0, 0);
 }
 
-void Renderer::textGen(SDL_Texture* font, int fw, int fh, int x, int y, const std::string& str, int r, int g, int b, int a) {
+void Renderer::begin(int w, int h) {
+	nvgBeginFrame(m_ren, w, h, float(w) / float(h));
+}
+
+void Renderer::end() {
+	nvgEndFrame(m_ren);
+}
+
+void Renderer::textGen(int font, int fw, int fh, int x, int y, const std::string& str, int r, int g, int b, int a) {
 	int tx = x, ty = y;
 	for (int i = 0; i < str.size(); i++) {
 		int c = str[i];
@@ -268,16 +278,12 @@ void Renderer::textGen(SDL_Texture* font, int fw, int fh, int x, int y, const st
 	}
 }
 
-void Renderer::putChar(SDL_Texture* font, int fw, int fh, int x, int y, char c, int r, int g, int b, int a) {
+void Renderer::putChar(int font, int fw, int fh, int x, int y, char c, int r, int g, int b, int a) {
 	const int cw = fw / 16;
 	const int ch = fh / 16;
 
 	const int sx = int(c & 0x7F) % 16 * cw;
 	const int sy = int(c & 0x7F) / 16 * ch;
-	SDL_Rect dstRect = { x, y, cw, ch };
-	SDL_Rect srcRect = { sx, sy, cw, ch };
 
-	SDL_SetTextureColorMod(font, r, g, b);
-	SDL_SetTextureAlphaMod(font, a);
-	SDL_RenderCopy(m_ren, font, &srcRect, &dstRect);
+	image(font, x, y, cw, ch, sx, sy, cw, ch, r, g, b, a);
 }
