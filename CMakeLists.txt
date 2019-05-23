@@ -50,17 +50,23 @@ add_executable(${PROJECT_NAME} ${SRC})
 
 target_link_libraries(${PROJECT_NAME} PRIVATE sndfilter)
 
-if (MINGW OR UNIX)
+if (MINGW)
 	target_link_libraries(${PROJECT_NAME} PRIVATE ${SDL2_LIBRARIES})
 	if (NOT PERF_TESTS)
 		target_link_libraries(${PROJECT_NAME} PRIVATE stdc++fs)
 	endif()
 else()
-	target_link_libraries(${PROJECT_NAME} PRIVATE SDL2::SDL2 SDL2::SDL2main)
+	target_link_libraries(${PROJECT_NAME} PRIVATE SDL2::SDL2 SDL2::SDL2main stdc++fs)
 endif()
 
 if (NOT PERF_TESTS)
 	target_link_libraries(${PROJECT_NAME} PRIVATE gui osdialog rtmidi)
+endif()
+
+if (CMAKE_DL_LIBS)
+	target_link_libraries(${PROJECT_NAME} PRIVATE 
+		${CMAKE_DL_LIBS}
+	)
 endif()
 
 get_target_property(OUT ${PROJECT_NAME} LINK_LIBRARIES)

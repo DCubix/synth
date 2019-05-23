@@ -32,7 +32,7 @@ target_include_directories(${PROJECT_NAME} PUBLIC /)
 
 add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/nanovg)
 
-if (MINGW OR UNIX)
+if (MINGW)
 	target_link_libraries(${PROJECT_NAME}
 		PRIVATE
 		${SDL2_LIBRARIES}
@@ -44,5 +44,12 @@ else()
 		PRIVATE
 		SDL2::SDL2 SDL2::SDL2main
 		nanovg
+		stdc++fs
+	)
+endif()
+
+if (CMAKE_DL_LIBS)
+	target_link_libraries(${PROJECT_NAME} PRIVATE 
+		${CMAKE_DL_LIBS}
 	)
 endif()
